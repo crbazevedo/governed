@@ -10,7 +10,9 @@ This bridges the gap between "code-defined governance" and
 "config-driven governance": operators can change policies by editing
 a TOML file instead of redeploying code.
 
-Example TOML (governance.toml)::
+Supports both single-domain and multi-domain configurations.
+
+Single-domain example (governance.toml)::
 
     [profile]
     domain = "corporate"
@@ -19,30 +21,46 @@ Example TOML (governance.toml)::
     [profile.vt_floor]
     read_email = 0
     send_email = 2
-    deploy = 3
-    delete_data = 4
-
-    [profile.blocked_tools]
-    tools = ["personal_calendar", "health_records"]
 
     [pipeline]
-    handlers = ["pii_filter", "rate_limiter", "vt_governance", "audit"]
+    handlers = ["pii_filter", "vt_governance", "audit"]
 
-    [pipeline.rate_limiter]
-    max_per_window = 10
-    window_seconds = 60
+Multi-domain example (governance.toml)::
 
-    [pipeline.budget]
-    limit_usd = 5.0
+    [domains.personal]
+    default_vt = 1
+    pii_sensitivity = 1
+
+    [domains.personal.vt_floor]
+    read_email = 0
+    send_email = 1
+
+    [domains.corporate]
+    default_vt = 2
+    audit_required = true
+
+    [domains.corporate.vt_floor]
+    send_email = 2
+    deploy = 3
+
+    [domains.corporate.blocked_tools]
+    tools = ["personal_calendar"]
+
+    [barrier]
+    allowed_fields = ["timestamp", "duration_minutes", "urgency", "action_type"]
+
+    [pipeline]
+    handlers = ["pii", "blast_radius", "trust_evolution", "vt", "audit"]
 """
 
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from governed_agents.domain import GovernanceProfile
+from governed_agents.domain import DomainBarrierHandler, GovernanceProfile
 from governed_agents.pipeline import GovernancePipeline
 
 if TYPE_CHECKING:
@@ -157,12 +175,14 @@ def _ensure_registry() -> dict[str, type[GovernanceHandler]]:
     if _HANDLER_REGISTRY:
         return _HANDLER_REGISTRY
 
+    from governed_agents.blast_radius import BlastRadiusHandler
     from governed_agents.handlers.audit import AuditLogger
     from governed_agents.handlers.budget import BudgetGatekeeper
     from governed_agents.handlers.compliance import ComplianceChecker
     from governed_agents.handlers.pii_filter import PIIFilter
     from governed_agents.handlers.rate_limiter import RateLimiter
     from governed_agents.handlers.ux import UXHandler
+    from governed_agents.trust import TrustEvolutionHandler
     from governed_agents.vt import VTGovernanceHandler
 
     _HANDLER_REGISTRY.update(
@@ -181,6 +201,8 @@ def _ensure_registry() -> dict[str, type[GovernanceHandler]]:
             "compliance_checker": ComplianceChecker,
             "ux": UXHandler,
             "ux_handler": UXHandler,
+            "blast_radius": BlastRadiusHandler,
+            "trust_evolution": TrustEvolutionHandler,
         }
     )
 
@@ -219,6 +241,16 @@ def _build_handler(name: str, handler_config: dict[str, Any]) -> GovernanceHandl
             kwargs["max_payload_kb"] = int(handler_config["max_payload_kb"])
         if "strict_mode" in handler_config:
             kwargs["strict_mode"] = bool(handler_config["strict_mode"])
+
+    elif name == "blast_radius":
+        from governed_agents.blast_radius import BlastRadiusPolicy
+
+        kwargs["policy"] = BlastRadiusPolicy()
+
+    elif name == "trust_evolution":
+        from governed_agents.trust import TrustLedger
+
+        kwargs["ledger"] = TrustLedger()
 
     return handler_cls(**kwargs)
 
@@ -266,3 +298,131 @@ def load_pipeline_config(
         pipeline.add(handler, optional=(name in optional_handlers))
 
     return pipeline
+
+
+# ──────────────────────────────────────────────
+# Multi-domain configuration
+# ──────────────────────────────────────────────
+
+
+@dataclass
+class DomainConfig:
+    """Result of loading a multi-domain governance configuration.
+
+    Attributes:
+        profiles: Dict mapping domain name to GovernanceProfile.
+        barrier: A DomainBarrierHandler configured with the profiles.
+        pipeline: A GovernancePipeline with the barrier prepended and
+                  remaining handlers from the ``[pipeline]`` section.
+    """
+
+    profiles: dict[str, GovernanceProfile]
+    barrier: DomainBarrierHandler
+    pipeline: GovernancePipeline
+
+
+def load_domain_config(
+    source: str | Path | dict[str, Any],
+) -> DomainConfig:
+    """Load a multi-domain governance configuration.
+
+    Reads a TOML file or dict containing a ``[domains.*]`` section with
+    per-domain profiles, a ``[barrier]`` section with allowed cross-domain
+    fields, and a ``[pipeline]`` section with handler names.
+
+    The resulting pipeline has the DomainBarrierHandler prepended at the
+    lowest priority, followed by the declared handlers.
+
+    Args:
+        source: Path to a TOML file, or a dict with multi-domain config.
+
+    Returns:
+        A DomainConfig containing profiles, barrier, and pipeline.
+
+    Raises:
+        ValueError: If no domains are defined.
+
+    Example TOML::
+
+        [domains.personal]
+        default_vt = 1
+
+        [domains.personal.vt_floor]
+        read_email = 0
+        send_email = 1
+
+        [domains.corporate]
+        default_vt = 2
+
+        [domains.corporate.vt_floor]
+        send_email = 2
+        deploy = 3
+
+        [barrier]
+        allowed_fields = ["timestamp", "urgency"]
+
+        [pipeline]
+        handlers = ["pii", "vt", "audit"]
+
+    Example dict::
+
+        load_domain_config({
+            "domains": {
+                "personal": {"default_vt": 1, "vt_floor": {"send_email": 1}},
+                "corporate": {"default_vt": 2, "vt_floor": {"send_email": 2}},
+            },
+            "barrier": {"allowed_fields": ["timestamp"]},
+            "pipeline": {"handlers": ["pii", "vt", "audit"]},
+        })
+    """
+    if isinstance(source, (str, Path)):
+        raw = _read_toml(source)
+    else:
+        raw = source
+
+    domains_raw = raw.get("domains", {})
+    if not domains_raw:
+        raise ValueError(
+            "Multi-domain config must include a 'domains' section with at least one domain."
+        )
+
+    # Build profiles per domain
+    profiles: dict[str, GovernanceProfile] = {}
+    for domain_name, domain_conf in domains_raw.items():
+        # Inject domain name so load_profile can use it
+        conf = dict(domain_conf)
+        conf.setdefault("domain", domain_name)
+        profiles[domain_name] = load_profile(conf)
+
+    # Build barrier handler
+    barrier_conf = raw.get("barrier", {})
+    allowed_fields_raw = barrier_conf.get("allowed_fields", None)
+    if allowed_fields_raw is not None:
+        allowed_fields = frozenset(allowed_fields_raw)
+    else:
+        # Use library default
+        from governed_agents.domain import CROSS_DOMAIN_ALLOWED_FIELDS
+
+        allowed_fields = CROSS_DOMAIN_ALLOWED_FIELDS
+
+    barrier = DomainBarrierHandler(profiles=profiles, allowed_fields=allowed_fields)
+
+    # Build pipeline with barrier prepended
+    pipeline = GovernancePipeline()
+    pipeline.register(barrier, priority=1)
+
+    pipeline_conf = raw.get("pipeline", {})
+    handler_names = pipeline_conf.get("handlers", [])
+
+    optional_handlers = {"audit", "audit_logger"}
+
+    for name in handler_names:
+        handler_config = pipeline_conf.get(name, {})
+        handler = _build_handler(name, handler_config)
+        pipeline.add(handler, optional=(name in optional_handlers))
+
+    return DomainConfig(
+        profiles=profiles,
+        barrier=barrier,
+        pipeline=pipeline,
+    )

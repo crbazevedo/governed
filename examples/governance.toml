@@ -1,26 +1,45 @@
-# Governance profile and pipeline configuration.
+# Multi-domain governance profile and pipeline configuration.
 #
-# This file defines a corporate governance profile and a pipeline
-# that enforces PII filtering, rate limiting, VT tier governance,
+# This file defines personal and corporate governance domains with
+# different VT floors, an information barrier, and a pipeline that
+# enforces PII filtering, rate limiting, VT tier governance,
 # budget controls, and audit logging.
 #
-# Load with: load_pipeline_config("governance.toml")
+# Single-domain usage:  load_pipeline_config("governance.toml")
+# Multi-domain usage:   load_domain_config("governance.toml")
 
-[profile]
-domain = "corporate"
-default_vt = 2
-pii_sensitivity = 2
-audit_required = true
+# ── Per-domain profiles ──────────────────────────────────
 
-[profile.vt_floor]
+[domains.personal]
+default_vt = 1
+pii_sensitivity = 1
+
+[domains.personal.vt_floor]
 read_email = 0
+send_email = 1
+schedule = 0
+
+[domains.corporate]
+default_vt = 2
+audit_required = true
+pii_sensitivity = 2
+
+[domains.corporate.vt_floor]
+read_email = 1
 search_docs = 1
 send_email = 2
 deploy = 3
 delete_data = 4
 
-[profile.blocked_tools]
-tools = ["personal_calendar", "health_records", "social_media"]
+[domains.corporate.blocked_tools]
+tools = ["personal_calendar", "health_records", "personal_finance"]
+
+# ── Cross-domain information barrier ─────────────────────
+
+[barrier]
+allowed_fields = ["timestamp", "duration_minutes", "urgency", "action_type"]
+
+# ── Pipeline (shared across domains) ─────────────────────
 
 [pipeline]
 handlers = ["pii_filter", "rate_limiter", "vt_governance", "budget", "audit"]

@@ -14,9 +14,11 @@ Core types are exported here. Advanced features via submodule imports:
     from governed_agents.domain import GovernanceProfile, DomainBarrierHandler, DomainScope
     from governed_agents.handlers import PIIFilter, RateLimiter, BudgetGatekeeper, AuditLogger
     from governed_agents.decorator import governed, configure, GovernanceError
-    from governed_agents.profile_loader import load_profile, load_pipeline_config
+    from governed_agents.executor import RecoveryExecutor, RecoveryOutcome
+    from governed_agents.profile_loader import load_profile, load_pipeline_config, load_domain_config
 """
 
+from governed_agents.executor import RecoveryExecutor, RecoveryOutcome
 from governed_agents.handler import (
     ActionContext,
     ExecutionMode,
@@ -42,6 +44,8 @@ __all__ = [
     "HITLIntent",
     "HITLMessage",
     "RecoveryAction",
+    "RecoveryExecutor",
+    "RecoveryOutcome",
     "RecoveryPlan",
     "Verdict",
     "VTGovernanceHandler",
