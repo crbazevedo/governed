@@ -20,35 +20,27 @@ from governed_agents.handlers import (
 class TestPIIFilter:
     async def test_no_pii_continues(self):
         f = PIIFilter()
-        ctx = ActionContext(
-            action="test", payload={"message": "Hello world"}
-        )
+        ctx = ActionContext(action="test", payload={"message": "Hello world"})
         result = await f.evaluate(ctx)
         assert result.action == Verdict.ALLOW
 
     async def test_email_detected_and_redacted(self):
         f = PIIFilter()
-        ctx = ActionContext(
-            action="test", payload={"to": "user@example.com"}
-        )
+        ctx = ActionContext(action="test", payload={"to": "user@example.com"})
         result = await f.evaluate(ctx)
         assert result.action == Verdict.MODIFY
         assert "user@example.com" not in result.modified_context.payload["to"]
 
     async def test_phone_detected_and_redacted(self):
         f = PIIFilter(patterns=[r"\b\d{3}-\d{3}-\d{4}\b"])
-        ctx = ActionContext(
-            action="test", payload={"contact": "555-123-4567"}
-        )
+        ctx = ActionContext(action="test", payload={"contact": "555-123-4567"})
         result = await f.evaluate(ctx)
         assert result.action == Verdict.MODIFY
         assert "555-123-4567" not in result.modified_context.payload["contact"]
 
     async def test_redaction_disabled_blocks(self):
         f = PIIFilter(redact=False)
-        ctx = ActionContext(
-            action="test", payload={"message": "user@example.com"}
-        )
+        ctx = ActionContext(action="test", payload={"message": "user@example.com"})
         result = await f.evaluate(ctx)
         assert result.action == Verdict.BLOCK
 
@@ -124,6 +116,7 @@ class TestRateLimiter:
 class TestBudgetGatekeeper:
     async def test_under_budget_continues(self):
         from governed_agents.handlers.budget import ManualCostTracker
+
         tracker = ManualCostTracker()
         tracker.add_cost(5.0)
         bg = BudgetGatekeeper(budget_limit_usd=10.0, cost_provider=tracker)
@@ -133,6 +126,7 @@ class TestBudgetGatekeeper:
 
     async def test_over_budget_blocks(self):
         from governed_agents.handlers.budget import ManualCostTracker
+
         tracker = ManualCostTracker()
         tracker.add_cost(6.0)
         bg = BudgetGatekeeper(budget_limit_usd=5.0, cost_provider=tracker)
@@ -143,6 +137,7 @@ class TestBudgetGatekeeper:
 
     async def test_exact_budget_blocks(self):
         from governed_agents.handlers.budget import ManualCostTracker
+
         tracker = ManualCostTracker()
         tracker.add_cost(5.0)
         bg = BudgetGatekeeper(budget_limit_usd=5.0, cost_provider=tracker)
@@ -219,7 +214,9 @@ class TestComplianceChecker:
     async def test_vt_consistency(self):
         cc = ComplianceChecker()
         ctx = ActionContext(
-            action="test", agent_id="bot", vt_tier=1,
+            action="test",
+            agent_id="bot",
+            vt_tier=1,
             metadata={"governance_vt_tier": 2},
         )
         result = await cc.evaluate(ctx)

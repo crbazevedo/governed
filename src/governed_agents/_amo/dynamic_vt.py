@@ -161,8 +161,7 @@ class DynamicVTHandler(GovernanceHandler):
 
             return GovernanceResult.continue_(
                 handler_name=self.name,
-                reason=f"AMO confirms VT{context.vt_tier} is optimal "
-                f"(authority={authority:.2f})",
+                reason=f"AMO confirms VT{context.vt_tier} is optimal (authority={authority:.2f})",
             )
 
         except Exception as exc:

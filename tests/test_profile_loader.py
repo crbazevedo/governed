@@ -21,14 +21,16 @@ class TestLoadProfileDict:
         assert profile.default_vt == 2
 
     def test_full_dict(self):
-        profile = load_profile({
-            "domain": "corporate",
-            "default_vt": 3,
-            "vt_floor": {"send_email": 2, "deploy": 4},
-            "blocked_tools": ["personal_calendar"],
-            "pii_sensitivity": 2,
-            "audit_required": True,
-        })
+        profile = load_profile(
+            {
+                "domain": "corporate",
+                "default_vt": 3,
+                "vt_floor": {"send_email": 2, "deploy": 4},
+                "blocked_tools": ["personal_calendar"],
+                "pii_sensitivity": 2,
+                "audit_required": True,
+            }
+        )
         assert profile.domain == "corporate"
         assert profile.default_vt == 3
         assert profile.get_vt_floor("send_email") == 2
@@ -40,27 +42,33 @@ class TestLoadProfileDict:
         assert profile.audit_required is True
 
     def test_blocked_tools_as_list(self):
-        profile = load_profile({
-            "domain": "test",
-            "blocked_tools": ["a", "b"],
-        })
+        profile = load_profile(
+            {
+                "domain": "test",
+                "blocked_tools": ["a", "b"],
+            }
+        )
         assert not profile.is_tool_allowed("a")
         assert not profile.is_tool_allowed("b")
         assert profile.is_tool_allowed("c")
 
     def test_blocked_tools_as_dict_with_tools_key(self):
-        profile = load_profile({
-            "domain": "test",
-            "blocked_tools": {"tools": ["x", "y"]},
-        })
+        profile = load_profile(
+            {
+                "domain": "test",
+                "blocked_tools": {"tools": ["x", "y"]},
+            }
+        )
         assert not profile.is_tool_allowed("x")
         assert not profile.is_tool_allowed("y")
 
     def test_allowed_tools(self):
-        profile = load_profile({
-            "domain": "test",
-            "allowed_tools": ["a", "b"],
-        })
+        profile = load_profile(
+            {
+                "domain": "test",
+                "allowed_tools": ["a", "b"],
+            }
+        )
         assert profile.is_tool_allowed("a")
         assert profile.is_tool_allowed("b")
         assert not profile.is_tool_allowed("c")
@@ -75,39 +83,49 @@ class TestLoadProfileDict:
 
 class TestLoadPipelineConfigDict:
     def test_basic_pipeline(self):
-        pipeline = load_pipeline_config({
-            "handlers": ["pii_filter", "vt_governance"],
-        })
+        pipeline = load_pipeline_config(
+            {
+                "handlers": ["pii_filter", "vt_governance"],
+            }
+        )
         assert len(pipeline.handlers) == 2
 
     def test_pipeline_with_config(self):
-        pipeline = load_pipeline_config({
-            "handlers": ["rate_limiter", "vt_governance"],
-            "rate_limiter": {"max_per_window": 20, "window_seconds": 120},
-        })
+        pipeline = load_pipeline_config(
+            {
+                "handlers": ["rate_limiter", "vt_governance"],
+                "rate_limiter": {"max_per_window": 20, "window_seconds": 120},
+            }
+        )
         assert len(pipeline.handlers) == 2
 
     def test_pipeline_audit_is_optional(self):
-        pipeline = load_pipeline_config({
-            "handlers": ["vt", "audit"],
-        })
+        pipeline = load_pipeline_config(
+            {
+                "handlers": ["vt", "audit"],
+            }
+        )
         # audit handler should be marked optional
         for reg in pipeline.handlers:
             if reg.handler.name == "audit_logger":
                 assert reg.optional is True
 
     def test_full_pipeline(self):
-        pipeline = load_pipeline_config({
-            "handlers": ["pii_filter", "rate_limiter", "vt_governance", "budget", "audit"],
-            "rate_limiter": {"max_per_window": 10, "window_seconds": 60},
-            "budget": {"limit_usd": 5.0},
-        })
+        pipeline = load_pipeline_config(
+            {
+                "handlers": ["pii_filter", "rate_limiter", "vt_governance", "budget", "audit"],
+                "rate_limiter": {"max_per_window": 10, "window_seconds": 60},
+                "budget": {"limit_usd": 5.0},
+            }
+        )
         assert len(pipeline.handlers) == 5
 
     async def test_pipeline_executes(self):
-        pipeline = load_pipeline_config({
-            "handlers": ["pii_filter", "vt_governance"],
-        })
+        pipeline = load_pipeline_config(
+            {
+                "handlers": ["pii_filter", "vt_governance"],
+            }
+        )
         ctx = ActionContext(action="test", agent_id="bot", vt_tier=0)
         result = await pipeline.execute(ctx)
         assert result.action == Verdict.ALLOW
@@ -122,10 +140,22 @@ class TestLoadPipelineConfigDict:
 
     def test_handler_aliases(self):
         """All aliases should produce valid handlers."""
-        for alias in ["pii", "pii_filter", "rate_limit", "rate_limiter",
-                       "vt", "vt_governance", "audit", "audit_logger",
-                       "budget", "budget_gatekeeper", "compliance",
-                       "compliance_checker", "ux", "ux_handler"]:
+        for alias in [
+            "pii",
+            "pii_filter",
+            "rate_limit",
+            "rate_limiter",
+            "vt",
+            "vt_governance",
+            "audit",
+            "audit_logger",
+            "budget",
+            "budget_gatekeeper",
+            "compliance",
+            "compliance_checker",
+            "ux",
+            "ux_handler",
+        ]:
             pipeline = load_pipeline_config({"handlers": [alias]})
             assert len(pipeline.handlers) == 1
 

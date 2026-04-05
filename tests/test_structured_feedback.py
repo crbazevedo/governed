@@ -22,12 +22,14 @@ from governed_agents.vt import VTGovernanceHandler
 class TestGovernanceResultFeedback:
     def test_abort_has_default_empty_feedback(self):
         from governed_agents import GovernanceResult
+
         r = GovernanceResult.abort(handler_name="test", reason="blocked")
         assert r.suggestion == ""
         assert r.alternatives == []
 
     def test_abort_accepts_suggestion_and_alternatives(self):
         from governed_agents import GovernanceResult
+
         r = GovernanceResult.abort(
             handler_name="test",
             reason="blocked",
@@ -39,6 +41,7 @@ class TestGovernanceResultFeedback:
 
     def test_continue_has_empty_feedback(self):
         from governed_agents import GovernanceResult
+
         r = GovernanceResult.continue_(handler_name="test", reason="ok")
         assert r.suggestion == ""
         assert r.alternatives == []

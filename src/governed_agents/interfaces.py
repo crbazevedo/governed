@@ -27,8 +27,8 @@ from typing import Any
 class PIIMatch:
     """A detected PII occurrence."""
 
-    field_path: str           # e.g., "payload.contact.email"
-    pattern_name: str         # e.g., "email", "ssn", "cpf"
+    field_path: str  # e.g., "payload.contact.email"
+    pattern_name: str  # e.g., "email", "ssn", "cpf"
     original_value: str = ""  # The matched text (for logging, not for storage)
     start: int = 0
     end: int = 0
@@ -110,7 +110,7 @@ class AuditEntry:
     action: str
     agent_id: str
     vt_tier: int
-    verdict: str              # "allow", "block", "modify"
+    verdict: str  # "allow", "block", "modify"
     handler_name: str = ""
     reason: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)

@@ -23,13 +23,13 @@ from governed_agents.handler import (
 class AOWState(str, Enum):
     """Lifecycle state of an Action Opportunity Window."""
 
-    PENDING = "pending"          # Window not yet open
-    OPEN = "open"                # Within the window, action can be taken
-    OPTIMAL = "optimal"          # Within the preferred sub-window
-    EXPIRING = "expiring"        # Window closing soon (configurable threshold)
-    EXPIRED = "expired"          # Window closed, action no longer possible
-    BLOCKED = "blocked"          # Externally blocked (dependency not met)
-    COMPLETED = "completed"      # Action was taken within the window
+    PENDING = "pending"  # Window not yet open
+    OPEN = "open"  # Within the window, action can be taken
+    OPTIMAL = "optimal"  # Within the preferred sub-window
+    EXPIRING = "expiring"  # Window closing soon (configurable threshold)
+    EXPIRED = "expired"  # Window closed, action no longer possible
+    BLOCKED = "blocked"  # Externally blocked (dependency not met)
+    COMPLETED = "completed"  # Action was taken within the window
 
 
 @dataclass

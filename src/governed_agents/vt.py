@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 class VTTier(IntEnum):
     """VT risk tier levels."""
 
-    AUTO = 0      # Agent acts freely
-    LOG = 1       # Agent acts, logs for review
-    APPROVE = 2   # Agent proposes, owner approves
-    ADVISE = 3    # Agent advises only
-    BLOCK = 4     # Owner-only action
+    AUTO = 0  # Agent acts freely
+    LOG = 1  # Agent acts, logs for review
+    APPROVE = 2  # Agent proposes, owner approves
+    ADVISE = 3  # Agent advises only
+    BLOCK = 4  # Owner-only action
 
     @property
     def label(self) -> str:
@@ -89,22 +89,35 @@ class VTPolicy:
             0: cls(tier=0, action="auto", label="Autonomous"),
             1: cls(tier=1, action="log", label="Log & Proceed"),
             2: cls(
-                tier=2, action="approve", label="Require Approval",
+                tier=2,
+                action="approve",
+                label="Require Approval",
                 requires_approval=True,
             ),
             3: cls(
-                tier=3, action="advise", label="Advise Only",
+                tier=3,
+                action="advise",
+                label="Advise Only",
                 allows_execution=False,
             ),
             4: cls(
-                tier=4, action="block", label="Owner Only",
-                requires_approval=True, allows_execution=False,
+                tier=4,
+                action="block",
+                label="Owner Only",
+                requires_approval=True,
+                allows_execution=False,
             ),
         }
-        return configs.get(tier, cls(
-            tier=tier, action="block", label="Unknown",
-            requires_approval=True, allows_execution=False,
-        ))
+        return configs.get(
+            tier,
+            cls(
+                tier=tier,
+                action="block",
+                label="Unknown",
+                requires_approval=True,
+                allows_execution=False,
+            ),
+        )
 
 
 class VTGovernanceHandler(GovernanceHandler):
@@ -134,14 +147,18 @@ class VTGovernanceHandler(GovernanceHandler):
 
         if tier_policy == "log":
             # Inject review metadata for downstream handlers
-            new_meta = {**context.metadata,
-                        "governance_review_required": True,
-                        "governance_vt_tier": vt,
-                        "governance_policy": tier_policy}
+            new_meta = {
+                **context.metadata,
+                "governance_review_required": True,
+                "governance_vt_tier": vt,
+                "governance_policy": tier_policy,
+            }
             new_context = replace(context, metadata=new_meta)
             logger.info(
                 "VTGovernance: VT%d action '%s' by '%s' -- logged for review",
-                vt, context.action, context.agent_id,
+                vt,
+                context.action,
+                context.agent_id,
             )
             return GovernanceResult.modify(
                 modified_context=new_context,
@@ -151,9 +168,11 @@ class VTGovernanceHandler(GovernanceHandler):
 
         if tier_policy == "approve":
             if context.metadata.get("vt2_approved"):
-                new_meta = {**context.metadata,
-                            "governance_approval_verified": True,
-                            "governance_vt_tier": vt}
+                new_meta = {
+                    **context.metadata,
+                    "governance_approval_verified": True,
+                    "governance_vt_tier": vt,
+                }
                 new_context = replace(context, metadata=new_meta)
                 return GovernanceResult.modify(
                     modified_context=new_context,

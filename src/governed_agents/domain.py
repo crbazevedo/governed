@@ -120,9 +120,7 @@ class DomainBarrierHandler(GovernanceHandler):
             )
 
         # Cross-domain: filter payload to allowed fields only
-        filtered_payload = {
-            k: v for k, v in context.payload.items() if k in self._allowed_fields
-        }
+        filtered_payload = {k: v for k, v in context.payload.items() if k in self._allowed_fields}
         blocked_fields = set(context.payload.keys()) - self._allowed_fields
 
         if blocked_fields:

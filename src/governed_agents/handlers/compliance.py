@@ -57,20 +57,15 @@ class ComplianceChecker(GovernanceHandler):
         # Check 2: Audit readiness for VT1+
         if context.vt_tier >= 1:
             if not context.agent_id:
-                violations.append(
-                    "VT1+ actions require agent_id for audit trail"
-                )
+                violations.append("VT1+ actions require agent_id for audit trail")
             if not context.action:
-                violations.append(
-                    "VT1+ actions require action name for audit trail"
-                )
+                violations.append("VT1+ actions require action name for audit trail")
 
         # Check 3: VT consistency with governance metadata
         gov_vt = context.metadata.get("governance_vt_tier")
         if gov_vt is not None and gov_vt != context.vt_tier:
             violations.append(
-                f"VT tier mismatch: context says VT{context.vt_tier} "
-                f"but governance set VT{gov_vt}"
+                f"VT tier mismatch: context says VT{context.vt_tier} but governance set VT{gov_vt}"
             )
 
         if not violations:
@@ -88,9 +83,7 @@ class ComplianceChecker(GovernanceHandler):
             )
 
         # Non-strict: log and continue
-        logger.warning(
-            "ComplianceChecker: non-strict violations: %s", violation_msg
-        )
+        logger.warning("ComplianceChecker: non-strict violations: %s", violation_msg)
         new_context = deepcopy(context)
         new_context.metadata["compliance_warnings"] = violations
         return GovernanceResult.modify(

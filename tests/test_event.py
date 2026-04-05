@@ -79,6 +79,7 @@ class TestGovernedEvent:
 
     def test_vt_tier_bounds(self):
         import pytest
+
         with pytest.raises(Exception):
             GovernedEvent(event_type="test", vt_tier=5)
         with pytest.raises(Exception):

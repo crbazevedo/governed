@@ -162,22 +162,24 @@ def _ensure_registry() -> dict[str, type]:
     from governed_agents.handlers.ux import UXHandler
     from governed_agents.vt import VTGovernanceHandler
 
-    _HANDLER_REGISTRY.update({
-        "pii_filter": PIIFilter,
-        "pii": PIIFilter,
-        "rate_limiter": RateLimiter,
-        "rate_limit": RateLimiter,
-        "vt_governance": VTGovernanceHandler,
-        "vt": VTGovernanceHandler,
-        "audit": AuditLogger,
-        "audit_logger": AuditLogger,
-        "budget": BudgetGatekeeper,
-        "budget_gatekeeper": BudgetGatekeeper,
-        "compliance": ComplianceChecker,
-        "compliance_checker": ComplianceChecker,
-        "ux": UXHandler,
-        "ux_handler": UXHandler,
-    })
+    _HANDLER_REGISTRY.update(
+        {
+            "pii_filter": PIIFilter,
+            "pii": PIIFilter,
+            "rate_limiter": RateLimiter,
+            "rate_limit": RateLimiter,
+            "vt_governance": VTGovernanceHandler,
+            "vt": VTGovernanceHandler,
+            "audit": AuditLogger,
+            "audit_logger": AuditLogger,
+            "budget": BudgetGatekeeper,
+            "budget_gatekeeper": BudgetGatekeeper,
+            "compliance": ComplianceChecker,
+            "compliance_checker": ComplianceChecker,
+            "ux": UXHandler,
+            "ux_handler": UXHandler,
+        }
+    )
 
     return _HANDLER_REGISTRY
 

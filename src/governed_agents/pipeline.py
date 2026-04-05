@@ -252,8 +252,7 @@ class GovernancePipeline:
                 unmet = reg.depends_on - completed_handlers
                 if unmet:
                     logger.info(
-                        "Handler '%s' deferred from priority %d: "
-                        "unmet dependencies %s",
+                        "Handler '%s' deferred from priority %d: unmet dependencies %s",
                         reg.handler.name,
                         priority,
                         unmet,
@@ -277,13 +276,9 @@ class GovernancePipeline:
             all_parallel = all(r.mode == ExecutionMode.PARALLEL for r in ready)
 
             if all_parallel and len(ready) > 1:
-                result = await self._execute_parallel_traced(
-                    ready, context, handler_traces
-                )
+                result = await self._execute_parallel_traced(ready, context, handler_traces)
             else:
-                result = await self._execute_sequential_traced(
-                    ready, context, handler_traces
-                )
+                result = await self._execute_sequential_traced(ready, context, handler_traces)
 
             # Track completed handler names
             for reg in ready:

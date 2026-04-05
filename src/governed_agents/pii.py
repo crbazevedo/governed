@@ -24,15 +24,17 @@ from governed_agents.interfaces import PIIDetector, PIIMatch
 # Known PII field names (Tier 1 & Tier 2)
 # Values in these keys are fully replaced.
 # ──────────────────────────────────────────────
-PII_FIELDS: frozenset[str] = frozenset({
-    "stakeholder",
-    "stakeholders",
-    "assigned_to",
-    "owner",
-    "email",
-    "phone",
-    "name",
-})
+PII_FIELDS: frozenset[str] = frozenset(
+    {
+        "stakeholder",
+        "stakeholders",
+        "assigned_to",
+        "owner",
+        "email",
+        "phone",
+        "name",
+    }
+)
 
 # ──────────────────────────────────────────────
 # Built-in regex patterns for Tier 1 PII in free text
@@ -106,10 +108,7 @@ def _redact_value(
 
     # Recurse into nested structures
     if isinstance(value, dict):
-        return {
-            k: _redact_value(k, v, extra_compiled, redaction_marker)
-            for k, v in value.items()
-        }
+        return {k: _redact_value(k, v, extra_compiled, redaction_marker) for k, v in value.items()}
     if isinstance(value, list):
         return [
             _redact_value(key, item, extra_compiled, redaction_marker)
@@ -154,10 +153,7 @@ def redact_payload(
     """
     extra_compiled = [re.compile(p) for p in extra_patterns] if extra_patterns else None
     safe = copy.deepcopy(payload)
-    return {
-        k: _redact_value(k, v, extra_compiled, redaction_marker)
-        for k, v in safe.items()
-    }
+    return {k: _redact_value(k, v, extra_compiled, redaction_marker) for k, v in safe.items()}
 
 
 # ──────────────────────────────────────────────
@@ -225,8 +221,10 @@ class RegexPIIDetector(PIIDetector):
             for i, (o, r) in enumerate(zip(original, redacted)):
                 self._diff_payloads(o, r, f"{path}[{i}]", matches)
         elif original != redacted:
-            matches.append(PIIMatch(
-                field_path=path,
-                pattern_name="regex",
-                original_value=str(original)[:50] if original else "",
-            ))
+            matches.append(
+                PIIMatch(
+                    field_path=path,
+                    pattern_name="regex",
+                    original_value=str(original)[:50] if original else "",
+                )
+            )

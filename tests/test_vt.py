@@ -94,7 +94,9 @@ class TestVTGovernanceHandler:
 
     async def test_vt2_passes_with_approval(self, handler):
         ctx = ActionContext(
-            action="send_email", agent_id="bot", vt_tier=2,
+            action="send_email",
+            agent_id="bot",
+            vt_tier=2,
             metadata={"vt2_approved": True},
         )
         result = await handler.evaluate(ctx)

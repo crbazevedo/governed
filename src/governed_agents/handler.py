@@ -25,16 +25,16 @@ from typing import Any
 class Verdict(str, Enum):
     """Outcome of a handler evaluation."""
 
-    ALLOW = "allow"        # Pipeline proceeds to next handler
-    BLOCK = "block"        # Pipeline halts, action is blocked
-    MODIFY = "modify"      # Pipeline proceeds with modified context
+    ALLOW = "allow"  # Pipeline proceeds to next handler
+    BLOCK = "block"  # Pipeline halts, action is blocked
+    MODIFY = "modify"  # Pipeline proceeds with modified context
 
 
 class ExecutionMode(str, Enum):
     """How handlers in the same priority group are executed."""
 
     SEQUENTIAL = "sequential"  # Runs after previous handler completes
-    PARALLEL = "parallel"      # Runs concurrently with other parallel handlers
+    PARALLEL = "parallel"  # Runs concurrently with other parallel handlers
 
 
 @dataclass
@@ -45,9 +45,9 @@ class ActionContext:
     and an extensible metadata dict for handler-to-handler communication.
     """
 
-    action: str                          # The action being evaluated (e.g., tool name)
-    agent_id: str = ""                   # Source agent identity
-    vt_tier: int = 1                     # VT risk tier for the action
+    action: str  # The action being evaluated (e.g., tool name)
+    agent_id: str = ""  # Source agent identity
+    vt_tier: int = 1  # VT risk tier for the action
     payload: dict[str, Any] = field(default_factory=dict)  # Action payload
     metadata: dict[str, Any] = field(default_factory=dict)  # Handler-to-handler data
 

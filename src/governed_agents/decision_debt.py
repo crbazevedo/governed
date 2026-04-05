@@ -18,13 +18,13 @@ from typing import Any
 class DebtState(str, Enum):
     """Lifecycle state of a deferred decision."""
 
-    PENDING = "pending"              # Awaiting first decision
-    DEFERRED = "deferred"            # Human chose to defer
-    REMINDED = "reminded"            # System sent a reminder
-    REASSESSED = "reassessed"        # Decision was re-evaluated
-    RESOLVED = "resolved"            # Decision was made
-    ABORTED = "aborted"              # Action no longer relevant
-    ESCALATED = "escalated"          # Auto-escalated due to risk
+    PENDING = "pending"  # Awaiting first decision
+    DEFERRED = "deferred"  # Human chose to defer
+    REMINDED = "reminded"  # System sent a reminder
+    REASSESSED = "reassessed"  # Decision was re-evaluated
+    RESOLVED = "resolved"  # Decision was made
+    ABORTED = "aborted"  # Action no longer relevant
+    ESCALATED = "escalated"  # Auto-escalated due to risk
 
 
 @dataclass

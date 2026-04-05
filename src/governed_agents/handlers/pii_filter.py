@@ -64,9 +64,7 @@ class PIIFilter(GovernanceHandler):
                 handler_name=self.name,
                 reason=f"PII detected in payload ({len(matches)} matches, redaction disabled)",
                 suggestion="Remove PII from the payload before retrying",
-                alternatives=[
-                    f"Remove PII from field: {field}" for field in affected_fields
-                ],
+                alternatives=[f"Remove PII from field: {field}" for field in affected_fields],
             )
 
         redacted_payload = self._detector.redact(context.payload)

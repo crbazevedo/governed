@@ -200,9 +200,7 @@ def governed(
                 new_args = []
                 for i, param_name in enumerate(sig.parameters):
                     if i < len(args):
-                        new_args.append(
-                            modified_payload.get(param_name, args[i])
-                        )
+                        new_args.append(modified_payload.get(param_name, args[i]))
                     else:
                         break
                 args = tuple(new_args) if new_args else args

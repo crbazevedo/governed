@@ -74,6 +74,7 @@ class TestHITLMessage:
 
     def test_vt_tier_validation(self):
         import pytest
+
         with pytest.raises(Exception):
             HITLMessage(intent=HITLIntent.INFORM, summary="Bad", vt_tier=5)
         with pytest.raises(Exception):
