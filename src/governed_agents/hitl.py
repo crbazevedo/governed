@@ -19,6 +19,8 @@ class HITLIntent(str, Enum):
     INPUT_REQUESTED = "INPUT_REQUESTED"
     DECISION_REQUESTED = "DECISION_REQUESTED"
     ESCALATION = "ESCALATION"
+    DEADLINE_PROPOSED = "DEADLINE_PROPOSED"
+    DECISION_DEBT = "DECISION_DEBT"
 
 
 class HITLMessage(BaseModel):
@@ -36,4 +38,8 @@ class HITLMessage(BaseModel):
     agent_id: str = ""
     trace_id: str = ""
     timeout_seconds: int | None = None
+    related_aow_id: str = ""
+    deadline_minutes: int | None = None
+    fallback_action: str = ""
+    domain: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
