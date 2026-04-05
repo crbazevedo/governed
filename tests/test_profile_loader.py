@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from governed_agents import ActionContext, Verdict
-from governed_agents.domain import GovernanceProfile
 from governed_agents.profile_loader import load_pipeline_config, load_profile
 
 

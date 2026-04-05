@@ -12,7 +12,6 @@ import asyncio
 from governed_agents import (
     ActionContext,
     GovernancePipeline,
-    Verdict,
     VTGovernanceHandler,
 )
 from governed_agents.decorator import GovernanceError, configure, governed

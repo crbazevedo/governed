@@ -44,7 +44,7 @@ async def governance_gate(state: dict, pipeline: GovernancePipeline) -> dict:
 
 async def publisher(state: dict) -> dict:
     state["published"] = True
-    print(f"  [publisher] Published!")
+    print("  [publisher] Published!")
     return state
 
 

@@ -1,6 +1,17 @@
 name: CI
 on: [push, pull_request]
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: ruff check src/ tests/ examples/ benchmarks/
+      - run: ruff format --check src/ tests/
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -12,5 +23,4 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: ruff check src/ tests/
       - run: pytest tests/ -v --tb=short

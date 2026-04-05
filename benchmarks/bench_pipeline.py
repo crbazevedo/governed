@@ -179,7 +179,7 @@ def print_table(rows: list[tuple[str, dict[str, float]]]) -> None:
 
 async def main() -> None:
     print("governed-agents pipeline benchmarks")
-    print(f"Iterations: 1000 per benchmark\n")
+    print("Iterations: 1000 per benchmark\n")
 
     rows: list[tuple[str, dict[str, float]]] = []
 

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import tempfile
-from pathlib import Path
 
 from governed_agents import ActionContext, Verdict
 from governed_agents.handlers import (

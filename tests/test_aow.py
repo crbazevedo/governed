@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from governed_agents.aow import AOWHandler, AOWState, AOWWindow
 from governed_agents.handler import ActionContext, Verdict

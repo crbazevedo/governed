@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from governed_agents import ActionContext, GovernancePipeline, Verdict
+from governed_agents import GovernancePipeline
 from governed_agents.decorator import (
     GovernanceError,
     configure,
@@ -12,7 +12,6 @@ from governed_agents.decorator import (
     governed,
     reset_pipeline,
 )
-from governed_agents.handlers import PIIFilter
 from governed_agents.vt import VTGovernanceHandler
 
 

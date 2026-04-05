@@ -11,8 +11,8 @@ Run: python examples/dynamic_example.py
 
 from datetime import datetime, timedelta, timezone
 
-from governed_agents.aow import AOWState, AOWWindow
-from governed_agents.decision_debt import DecisionDebt, DecisionDebtLedger, DebtState
+from governed_agents.aow import AOWWindow
+from governed_agents.decision_debt import DecisionDebt, DecisionDebtLedger
 
 
 def demo_aow():

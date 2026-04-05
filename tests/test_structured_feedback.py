@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from governed_agents import ActionContext, Verdict
-from governed_agents.aow import AOWHandler, AOWState, AOWWindow
+from governed_agents.aow import AOWHandler, AOWWindow
 from governed_agents.handlers import BudgetGatekeeper, PIIFilter, RateLimiter
 from governed_agents.handlers.budget import ManualCostTracker
 from governed_agents.vt import VTGovernanceHandler

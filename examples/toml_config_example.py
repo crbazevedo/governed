@@ -9,7 +9,7 @@ Run: python examples/toml_config_example.py
 import asyncio
 import sys
 
-from governed_agents import ActionContext, Verdict
+from governed_agents import ActionContext
 from governed_agents.profile_loader import load_pipeline_config, load_profile
 
 
