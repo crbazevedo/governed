@@ -1,5 +1,7 @@
 """Domain-scoped governance for BYOPA (Bring Your Own Personal Agent).
 
+# Layer: Dynamic (stateful runtime, configuration-driven)
+
 Enables the same governance library to enforce different policies
 in different domains (e.g., personal vs corporate), with information
 barriers preventing content leakage across domain boundaries.
@@ -30,12 +32,13 @@ class DomainScope(str, Enum):
 class GovernanceProfile:
     """Domain-specific governance configuration.
 
-    Each domain has its own VT ceiling map (action -> max VT tier),
+    Each domain has a VT floor map (action -> minimum VT tier required),
     allowed/blocked tools, PII sensitivity level, and audit requirements.
     """
 
     domain: str
-    vt_ceiling: dict[str, int] = field(default_factory=dict)  # action -> max VT
+    vt_floor: dict[str, int] = field(default_factory=dict)
+    """Minimum VT tier required per action. Actions not listed use default_vt."""
     default_vt: int = 2
     allowed_tools: set[str] | None = None  # None = all allowed
     blocked_tools: set[str] = field(default_factory=set)
@@ -43,9 +46,9 @@ class GovernanceProfile:
     audit_required: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_vt_ceiling(self, action: str) -> int:
-        """Get the VT ceiling for an action in this domain."""
-        return self.vt_ceiling.get(action, self.default_vt)
+    def get_vt_floor(self, action: str) -> int:
+        """Get the minimum VT tier required for an action in this domain."""
+        return self.vt_floor.get(action, self.default_vt)
 
     def is_tool_allowed(self, tool_name: str) -> bool:
         """Check if a tool is allowed in this domain."""
@@ -56,12 +59,12 @@ class GovernanceProfile:
         return True
 
 
-# Metadata fields allowed to cross domain boundaries
+# Metadata fields allowed to cross domain boundaries.
+# Override via the allowed_fields parameter on DomainBarrierHandler.
 CROSS_DOMAIN_ALLOWED_FIELDS = frozenset(
     {
         "timestamp",
         "duration_minutes",
-        "participant_count",
         "urgency",
         "domain_scope",
         "action_type",
@@ -73,8 +76,7 @@ class DomainBarrierHandler(GovernanceHandler):
     """Enforces information barriers between governance domains.
 
     Prevents content from one domain leaking into another.
-    Only metadata fields in CROSS_DOMAIN_ALLOWED_FIELDS can
-    cross the barrier.
+    Only metadata fields in the allowed set can cross the barrier.
     """
 
     def __init__(
@@ -93,22 +95,28 @@ class DomainBarrierHandler(GovernanceHandler):
         domain = context.metadata.get("domain_scope")
         target_domain = context.metadata.get("target_domain")
 
-        # No cross-domain activity -- pass through
-        if not domain or not target_domain or domain == target_domain:
-            # Apply domain profile VT ceiling if available
-            profile = self._profiles.get(domain, None) if domain else None
+        # No domain set — pass through
+        if not domain:
+            return GovernanceResult.continue_(
+                handler_name=self.name,
+                reason="No domain scope set",
+            )
+
+        # Same-domain or no cross-domain target
+        if not target_domain or domain == target_domain:
+            profile = self._profiles.get(domain)
             if profile:
-                ceiling = profile.get_vt_ceiling(context.action)
-                if context.vt_tier < ceiling:
-                    modified = replace(context, vt_tier=ceiling)
+                floor = profile.get_vt_floor(context.action)
+                if context.vt_tier < floor:
+                    modified = replace(context, vt_tier=floor)
                     return GovernanceResult.modify(
                         modified_context=modified,
                         handler_name=self.name,
-                        reason=f"Domain {domain} requires VT{ceiling} for {context.action}",
+                        reason=f"Domain '{domain}' requires VT{floor} for '{context.action}'",
                     )
             return GovernanceResult.continue_(
                 handler_name=self.name,
-                reason="No cross-domain activity",
+                reason=f"Same-domain '{domain}', policy satisfied",
             )
 
         # Cross-domain: filter payload to allowed fields only
@@ -129,11 +137,12 @@ class DomainBarrierHandler(GovernanceHandler):
             return GovernanceResult.modify(
                 modified_context=modified,
                 handler_name=self.name,
-                reason=f"Cross-domain barrier: {len(blocked_fields)} fields filtered, "
+                reason=f"Cross-domain barrier ({domain}→{target_domain}): "
+                f"{len(blocked_fields)} fields filtered, "
                 f"{len(filtered_payload)} fields passed (metadata only)",
             )
 
         return GovernanceResult.continue_(
             handler_name=self.name,
-            reason="Cross-domain payload contains only allowed metadata fields",
+            reason=f"Cross-domain ({domain}→{target_domain}): payload contains only allowed metadata",
         )

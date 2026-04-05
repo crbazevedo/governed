@@ -134,7 +134,7 @@ class TestDecisionDebtEscalation:
         debt = self._make_debt(
             created_at=now - timedelta(hours=6),
             deadline=now + timedelta(hours=6),
-            deadline_escalation_factor=2.0,
+            escalation_threshold=0.5,
         )
         # elapsed = 6h, total = 12h, ratio = 0.5, threshold = 1/2.0 = 0.5
         assert debt.should_escalate(now)
@@ -144,7 +144,7 @@ class TestDecisionDebtEscalation:
         debt = self._make_debt(
             created_at=now - timedelta(hours=1),
             deadline=now + timedelta(hours=11),
-            deadline_escalation_factor=2.0,
+            escalation_threshold=0.5,
         )
         # elapsed = 1h, total = 12h, ratio ~0.083, threshold = 0.5
         assert not debt.should_escalate(now)
@@ -167,26 +167,26 @@ class TestDecisionDebtRiskScore:
 
     def test_zero_risk_when_fresh(self):
         debt = self._make_debt()
-        assert debt.risk_score == 0.0
+        assert debt.risk_score() == 0.0
 
     def test_deferral_risk_component(self):
         debt = self._make_debt(max_deferrals=10)
         debt.defer("1")
         debt.defer("2")
         # deferral_risk = (2/10) * 0.5 = 0.1, no deadline = 0 deadline risk
-        assert debt.risk_score == pytest.approx(0.1)
+        assert debt.risk_score() == pytest.approx(0.1)
 
     def test_max_deferrals_caps_at_half(self):
         debt = self._make_debt(max_deferrals=2)
         debt.defer("1")
         # 1 deferral, state = DEFERRED, deferral_risk = (1/2) * 0.5 = 0.25
-        assert debt.risk_score == pytest.approx(0.25)
+        assert debt.risk_score() == pytest.approx(0.25)
         debt.defer("2")  # Hits threshold, state -> ESCALATED
         # deferral_risk = min(2/2, 1.0) * 0.5 = 0.5
-        assert debt.risk_score == pytest.approx(0.5)
+        assert debt.risk_score() == pytest.approx(0.5)
         debt.defer("3")  # Over max
         # deferral_risk = min(3/2, 1.0) * 0.5 = 0.5 (capped)
-        assert debt.risk_score == pytest.approx(0.5)
+        assert debt.risk_score() == pytest.approx(0.5)
 
     def test_risk_score_bounded_at_one(self):
         now = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
@@ -198,7 +198,7 @@ class TestDecisionDebtRiskScore:
         debt.defer("1")
         debt.defer("2")
         # Both components maxed
-        assert debt.risk_score <= 1.0
+        assert debt.risk_score() <= 1.0
 
 
 # ── DecisionDebtLedger ───────────────────────────────────────────────
@@ -277,7 +277,7 @@ class TestDecisionDebtLedger:
 
     def test_total_risk_empty(self):
         ledger = DecisionDebtLedger()
-        assert ledger.total_risk == 0.0
+        assert ledger.total_risk() == 0.0
 
     def test_total_risk_with_debts(self):
         ledger = DecisionDebtLedger()
@@ -288,4 +288,4 @@ class TestDecisionDebtLedger:
         ledger.defer("D001", "1")
         ledger.defer("D001", "2")
         # d1 risk = (2/10)*0.5 = 0.1, d2 risk = 0.0, average = 0.05
-        assert ledger.total_risk == pytest.approx(0.05)
+        assert ledger.total_risk() == pytest.approx(0.05)

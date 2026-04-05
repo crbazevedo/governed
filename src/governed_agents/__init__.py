@@ -3,25 +3,16 @@
 Drop-in governance pipeline with VT (Verified Trust) risk tiers,
 PII redaction, rate limiting, budget controls, and human-in-the-loop
 escalation for any Python agent framework.
+
+Core types are exported here. Advanced features via submodule imports:
+
+    from governed_agents.aow import AOWWindow, AOWHandler, AOWState
+    from governed_agents.decision_debt import DecisionDebt, DecisionDebtLedger, DebtState
+    from governed_agents.approval import ApprovalBackend, ApprovalRequest, ApprovalResponse
+    from governed_agents.domain import GovernanceProfile, DomainBarrierHandler, DomainScope
+    from governed_agents.handlers import PIIFilter, RateLimiter, BudgetGatekeeper, AuditLogger
 """
 
-from governed_agents.aow import AOWHandler, AOWState, AOWWindow
-from governed_agents.approval import (
-    ApprovalBackend,
-    ApprovalRequest,
-    ApprovalResponse,
-    ApprovalStatus,
-)
-from governed_agents.decision_debt import (
-    DebtState,
-    DecisionDebt,
-    DecisionDebtLedger,
-)
-from governed_agents.domain import (
-    DomainBarrierHandler,
-    DomainScope,
-    GovernanceProfile,
-)
 from governed_agents.handler import (
     ActionContext,
     ExecutionMode,
@@ -36,23 +27,10 @@ from governed_agents.vt import VTGovernanceHandler, VTTier
 __version__ = "0.1.0"
 
 __all__ = [
-    "AOWHandler",
-    "AOWState",
-    "AOWWindow",
     "ActionContext",
-    "ApprovalBackend",
-    "ApprovalRequest",
-    "ApprovalResponse",
-    "ApprovalStatus",
-    "DebtState",
-    "DecisionDebt",
-    "DecisionDebtLedger",
-    "DomainBarrierHandler",
-    "DomainScope",
     "ExecutionMode",
     "GovernanceHandler",
     "GovernancePipeline",
-    "GovernanceProfile",
     "GovernanceResult",
     "HITLIntent",
     "HITLMessage",

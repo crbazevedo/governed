@@ -67,13 +67,8 @@ class PIIFilter(GovernanceHandler):
                 reason="PII detected in payload (redaction disabled)",
             )
 
-        new_context = ActionContext(
-            action=context.action,
-            agent_id=context.agent_id,
-            vt_tier=context.vt_tier,
-            payload=redacted_payload,
-            metadata=dict(context.metadata),
-        )
+        from dataclasses import replace
+        new_context = replace(context, payload=redacted_payload)
         logger.warning("PIIFilter: PII detected and redacted in payload")
         return GovernanceResult.modify(
             modified_context=new_context,

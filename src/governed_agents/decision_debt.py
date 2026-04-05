@@ -1,5 +1,7 @@
 """Decision Debt -- tracking deferred decisions as accumulating risk.
 
+# Layer: Dynamic (stateful runtime)
+
 When a human defers a VT2+ decision, it enters the Decision Debt ledger.
 Deferred decisions accumulate risk: after N deferrals or approaching deadline,
 they auto-escalate. This prevents decision paralysis in governed systems.
@@ -50,7 +52,9 @@ class DecisionDebt:
 
     # Escalation thresholds
     max_deferrals: int = 3
-    deadline_escalation_factor: float = 2.0  # escalate at 2x deadline proximity
+    escalation_threshold: float = 0.5
+    """Fraction of deadline elapsed that triggers escalation.
+    0.5 = escalate at the halfway point. 0.75 = escalate at 75%."""
 
     def defer(self, reason: str = "") -> DebtState:
         """Record a deferral. Returns new state (may escalate)."""
@@ -95,16 +99,18 @@ class DecisionDebt:
             now = now or datetime.now(timezone.utc)
             total_duration = (self.deadline - self.created_at).total_seconds()
             elapsed = (now - self.created_at).total_seconds()
-            if total_duration > 0 and elapsed / total_duration >= (
-                1 / self.deadline_escalation_factor
-            ):
+            if total_duration > 0 and elapsed / total_duration >= self.escalation_threshold:
                 return True
 
         return False
 
-    @property
-    def risk_score(self) -> float:
-        """Compute a risk score (0.0-1.0) based on deferrals and deadline proximity."""
+    def risk_score(self, now: datetime | None = None) -> float:
+        """Compute a risk score (0.0-1.0) based on deferrals and deadline proximity.
+
+        Args:
+            now: Current time. Defaults to UTC now. Pass explicitly for deterministic testing.
+        """
+        now = now or datetime.now(timezone.utc)
         score = 0.0
 
         # Deferral risk (0-0.5)
@@ -112,7 +118,6 @@ class DecisionDebt:
 
         # Deadline risk (0-0.5)
         if self.deadline:
-            now = datetime.now(timezone.utc)
             total = (self.deadline - self.created_at).total_seconds()
             elapsed = (now - self.created_at).total_seconds()
             if total > 0:
@@ -126,6 +131,11 @@ class DecisionDebtLedger:
 
     The ledger provides aggregate risk metrics and identifies
     decisions requiring escalation.
+
+    Note: This ledger is NOT thread-safe or async-safe. If multiple
+    pipeline executions may access it concurrently, the caller must
+    provide external synchronization (e.g., asyncio.Lock). For
+    production use, implement persistence via a backend adapter.
     """
 
     def __init__(self) -> None:
@@ -166,13 +176,12 @@ class DecisionDebtLedger:
         """Debts that should be escalated."""
         return [d for d in self.pending if d.should_escalate()]
 
-    @property
-    def total_risk(self) -> float:
+    def total_risk(self, now: datetime | None = None) -> float:
         """Aggregate risk score across all pending debts."""
         pending = self.pending
         if not pending:
             return 0.0
-        return sum(d.risk_score for d in pending) / len(pending)
+        return sum(d.risk_score(now) for d in pending) / len(pending)
 
     @property
     def count(self) -> int:

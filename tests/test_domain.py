@@ -28,19 +28,19 @@ class TestDomainScope:
 
 
 class TestGovernanceProfile:
-    def test_default_vt_ceiling(self):
+    def test_default_vt_floor(self):
         profile = GovernanceProfile(domain="personal")
-        assert profile.get_vt_ceiling("anything") == 2  # default_vt
+        assert profile.get_vt_floor("anything") == 2  # default_vt
 
-    def test_custom_vt_ceiling(self):
+    def test_custom_vt_floor(self):
         profile = GovernanceProfile(
             domain="corporate",
-            vt_ceiling={"deploy": 3, "read": 0},
+            vt_floor={"deploy": 3, "read": 0},
             default_vt=2,
         )
-        assert profile.get_vt_ceiling("deploy") == 3
-        assert profile.get_vt_ceiling("read") == 0
-        assert profile.get_vt_ceiling("unknown") == 2
+        assert profile.get_vt_floor("deploy") == 3
+        assert profile.get_vt_floor("read") == 0
+        assert profile.get_vt_floor("unknown") == 2
 
     def test_tool_allowed_when_no_restrictions(self):
         profile = GovernanceProfile(domain="personal")
@@ -145,10 +145,10 @@ class TestDomainBarrierHandler:
         # All fields are allowed, so ALLOW (not MODIFY)
         assert result.action == Verdict.ALLOW
 
-    async def test_domain_profile_vt_ceiling_applied(self):
+    async def test_domain_profile_vt_floor_applied(self):
         profile = GovernanceProfile(
             domain="corporate",
-            vt_ceiling={"deploy": 3},
+            vt_floor={"deploy": 3},
             default_vt=2,
         )
         handler = DomainBarrierHandler(profiles={"corporate": profile})
@@ -163,10 +163,10 @@ class TestDomainBarrierHandler:
         assert result.modified_context is not None
         assert result.modified_context.vt_tier == 3
 
-    async def test_domain_profile_no_elevation_when_at_ceiling(self):
+    async def test_domain_profile_no_elevation_when_at_floor(self):
         profile = GovernanceProfile(
             domain="corporate",
-            vt_ceiling={"deploy": 2},
+            vt_floor={"deploy": 2},
             default_vt=2,
         )
         handler = DomainBarrierHandler(profiles={"corporate": profile})
@@ -177,7 +177,7 @@ class TestDomainBarrierHandler:
             metadata={"domain_scope": "corporate"},
         )
         result = await handler.evaluate(ctx)
-        # vt_tier == ceiling, no modification needed
+        # vt_tier == floor, no modification needed
         assert result.action == Verdict.ALLOW
 
     async def test_custom_allowed_fields(self):
@@ -206,7 +206,8 @@ class TestDomainBarrierHandler:
         """Verify the default allowed fields set."""
         assert "timestamp" in CROSS_DOMAIN_ALLOWED_FIELDS
         assert "duration_minutes" in CROSS_DOMAIN_ALLOWED_FIELDS
-        assert "participant_count" in CROSS_DOMAIN_ALLOWED_FIELDS
         assert "urgency" in CROSS_DOMAIN_ALLOWED_FIELDS
         assert "domain_scope" in CROSS_DOMAIN_ALLOWED_FIELDS
         assert "action_type" in CROSS_DOMAIN_ALLOWED_FIELDS
+        # participant_count deliberately excluded (could reveal meeting sensitivity)
+        assert "participant_count" not in CROSS_DOMAIN_ALLOWED_FIELDS

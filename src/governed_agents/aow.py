@@ -1,5 +1,7 @@
 """Action Opportunity Windows -- time-bounded decision scheduling.
 
+# Layer: Dynamic (stateful runtime)
+
 An AOW encodes WHEN a governed action can happen, not just WHETHER it can.
 This separates authority (VT tiers) from timing (AOW windows).
 """
@@ -53,38 +55,50 @@ class AOWWindow:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def evaluate(self, now: datetime | None = None) -> AOWState:
-        """Evaluate the current state of this window."""
+        """Evaluate and update the current state of this window.
+
+        Terminal states (EXPIRED, COMPLETED) are latched — once entered,
+        the window cannot revert to an earlier state.
+
+        If ``latest`` is None, the window has no expiration and stays
+        OPEN indefinitely once ``earliest`` passes.
+        """
         now = now or datetime.now(timezone.utc)
+
+        # Terminal states are latched — once expired/completed, always so
+        if self.state in (AOWState.EXPIRED, AOWState.COMPLETED):
+            return self.state
 
         # Check blocked dependencies
         if self.blocked_by:
-            return AOWState.BLOCKED
-
-        # Check if completed
-        if self.state == AOWState.COMPLETED:
-            return AOWState.COMPLETED
+            self.state = AOWState.BLOCKED
+            return self.state
 
         # Check temporal boundaries
         if now < self.earliest:
-            return AOWState.PENDING
+            self.state = AOWState.PENDING
+            return self.state
 
         if self.latest and now > self.latest:
-            return AOWState.EXPIRED
+            self.state = AOWState.EXPIRED
+            return self.state
 
-        # Within window -- check if expiring
+        # Within window — check if expiring
         if self.latest:
             remaining = (self.latest - now).total_seconds() / 60
             if remaining <= self.expiry_warning_minutes:
-                return AOWState.EXPIRING
+                self.state = AOWState.EXPIRING
+                return self.state
 
         # Check if in optimal sub-window
         if self.optimal:
-            # Within 30 min of optimal time
             delta = abs((now - self.optimal).total_seconds()) / 60
             if delta <= 30:
-                return AOWState.OPTIMAL
+                self.state = AOWState.OPTIMAL
+                return self.state
 
-        return AOWState.OPEN
+        self.state = AOWState.OPEN
+        return self.state
 
     def mark_completed(self) -> None:
         """Mark this window as completed (action was taken)."""

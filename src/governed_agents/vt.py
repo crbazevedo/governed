@@ -16,7 +16,7 @@ Provides:
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
+from dataclasses import replace
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -134,10 +134,11 @@ class VTGovernanceHandler(GovernanceHandler):
 
         if tier_policy == "log":
             # Inject review metadata for downstream handlers
-            new_context = deepcopy(context)
-            new_context.metadata["governance_review_required"] = True
-            new_context.metadata["governance_vt_tier"] = vt
-            new_context.metadata["governance_policy"] = tier_policy
+            new_meta = {**context.metadata,
+                        "governance_review_required": True,
+                        "governance_vt_tier": vt,
+                        "governance_policy": tier_policy}
+            new_context = replace(context, metadata=new_meta)
             logger.info(
                 "VTGovernance: VT%d action '%s' by '%s' -- logged for review",
                 vt, context.action, context.agent_id,
@@ -150,9 +151,10 @@ class VTGovernanceHandler(GovernanceHandler):
 
         if tier_policy == "approve":
             if context.metadata.get("vt2_approved"):
-                new_context = deepcopy(context)
-                new_context.metadata["governance_approval_verified"] = True
-                new_context.metadata["governance_vt_tier"] = vt
+                new_meta = {**context.metadata,
+                            "governance_approval_verified": True,
+                            "governance_vt_tier": vt}
+                new_context = replace(context, metadata=new_meta)
                 return GovernanceResult.modify(
                     modified_context=new_context,
                     handler_name=self.name,
