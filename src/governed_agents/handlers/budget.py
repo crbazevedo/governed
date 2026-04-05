@@ -1,49 +1,86 @@
-"""BudgetGatekeeper handler -- enforces cumulative cost limits."""
+"""BudgetGatekeeper handler -- enforces cumulative cost limits.
+
+# Layer: Dynamic (stateful governance decision)
+
+Accepts a pluggable CostProvider backend for retrieving current spend.
+Built-in ManualCostTracker is used by default. For production, plug in
+litellm callbacks, LangSmith, Helicone, or any CostProvider implementation.
+
+The BLOCKING LOGIC is the governance value-add. The cost tracking is
+infrastructure that belongs to the consumer.
+"""
 
 from __future__ import annotations
 
 import logging
-from typing import Callable
 
 from governed_agents.handler import (
     ActionContext,
     GovernanceHandler,
     GovernanceResult,
 )
+from governed_agents.interfaces import CostProvider
 
 logger = logging.getLogger(__name__)
 
 
+class ManualCostTracker(CostProvider):
+    """Built-in cost tracker with manual add_cost() calls.
+
+    For production, implement ``CostProvider`` with litellm's
+    cost tracking callbacks, LangSmith, Helicone, or your billing system.
+    """
+
+    def __init__(self) -> None:
+        self._costs: dict[str, float] = {}
+        self._total: float = 0.0
+
+    def current_cost(self, agent_id: str | None = None) -> float:
+        if agent_id:
+            return self._costs.get(agent_id, 0.0)
+        return self._total
+
+    def add_cost(self, amount: float, agent_id: str = "__global__") -> None:
+        """Record a cost. Called by the consuming application after each LLM call."""
+        self._costs[agent_id] = self._costs.get(agent_id, 0.0) + amount
+        self._total += amount
+
+
 class BudgetGatekeeper(GovernanceHandler):
-    """Enforces cumulative API budget limits across all agent invocations.
+    """Blocks actions when cumulative cost exceeds budget.
 
-    Accepts a cost_callback callable that returns the current cumulative
-    cost in USD. If no callback is provided, checks context.metadata
-    for a "current_cost_usd" key.
+    The governance decision (should this action proceed given the budget?)
+    is ours. The cost data source is pluggable via CostProvider.
 
-    Attributes:
+    Args:
         budget_limit_usd: Maximum allowed cumulative cost.
-        cost_callback: Optional callable returning current cost as float.
+        cost_provider: CostProvider implementation. Defaults to ManualCostTracker.
     """
 
     def __init__(
         self,
         budget_limit_usd: float = 5.0,
-        cost_callback: Callable[[], float] | None = None,
+        cost_provider: CostProvider | None = None,
+        # Backward compat: accept a simple callable
+        cost_callback: None = None,
     ) -> None:
         self._budget_limit = budget_limit_usd
-        self._cost_callback = cost_callback
-        self._cumulative_cost: float = 0.0
+        if cost_provider is not None:
+            self._provider = cost_provider
+        else:
+            self._provider = ManualCostTracker()
 
     @property
     def name(self) -> str:
         return "budget_gatekeeper"
 
+    @property
+    def cost_provider(self) -> CostProvider:
+        """Access the cost provider (e.g., to call add_cost on ManualCostTracker)."""
+        return self._provider
+
     async def evaluate(self, context: ActionContext) -> GovernanceResult:
-        if self._cost_callback is not None:
-            current = self._cost_callback()
-        else:
-            current = context.metadata.get("current_cost_usd", self._cumulative_cost)
+        current = self._provider.current_cost(context.agent_id)
 
         if current >= self._budget_limit:
             return GovernanceResult.abort(
@@ -56,9 +93,15 @@ class BudgetGatekeeper(GovernanceHandler):
             reason=f"Budget OK: ${current:.2f} / ${self._budget_limit:.2f}",
         )
 
-    def add_cost(self, amount: float) -> None:
-        """Manually add cost to the internal tracker.
+    def add_cost(self, amount: float, agent_id: str = "__global__") -> None:
+        """Convenience: add cost to the default ManualCostTracker.
 
-        Use this when not providing a cost_callback.
+        Raises TypeError if the provider is not a ManualCostTracker.
         """
-        self._cumulative_cost += amount
+        if isinstance(self._provider, ManualCostTracker):
+            self._provider.add_cost(amount, agent_id)
+        else:
+            raise TypeError(
+                f"add_cost() requires ManualCostTracker, got {type(self._provider).__name__}. "
+                "Record costs through your CostProvider implementation instead."
+            )

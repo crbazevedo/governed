@@ -126,31 +126,32 @@ class TestRateLimiter:
 
 class TestBudgetGatekeeper:
     async def test_under_budget_continues(self):
-        bg = BudgetGatekeeper(budget_limit_usd=10.0, cost_callback=lambda: 5.0)
+        from governed_agents.handlers.budget import ManualCostTracker
+        tracker = ManualCostTracker()
+        tracker.add_cost(5.0)
+        bg = BudgetGatekeeper(budget_limit_usd=10.0, cost_provider=tracker)
         ctx = ActionContext(action="test")
         result = await bg.evaluate(ctx)
         assert result.action == Verdict.ALLOW
 
     async def test_over_budget_blocks(self):
-        bg = BudgetGatekeeper(budget_limit_usd=5.0, cost_callback=lambda: 6.0)
+        from governed_agents.handlers.budget import ManualCostTracker
+        tracker = ManualCostTracker()
+        tracker.add_cost(6.0)
+        bg = BudgetGatekeeper(budget_limit_usd=5.0, cost_provider=tracker)
         ctx = ActionContext(action="test")
         result = await bg.evaluate(ctx)
         assert result.action == Verdict.BLOCK
         assert "Budget exceeded" in result.reason
 
     async def test_exact_budget_blocks(self):
-        bg = BudgetGatekeeper(budget_limit_usd=5.0, cost_callback=lambda: 5.0)
+        from governed_agents.handlers.budget import ManualCostTracker
+        tracker = ManualCostTracker()
+        tracker.add_cost(5.0)
+        bg = BudgetGatekeeper(budget_limit_usd=5.0, cost_provider=tracker)
         ctx = ActionContext(action="test")
         result = await bg.evaluate(ctx)
         assert result.action == Verdict.BLOCK
-
-    async def test_metadata_cost(self):
-        bg = BudgetGatekeeper(budget_limit_usd=10.0)
-        ctx = ActionContext(
-            action="test", metadata={"current_cost_usd": 3.0}
-        )
-        result = await bg.evaluate(ctx)
-        assert result.action == Verdict.ALLOW
 
     async def test_add_cost_manual(self):
         bg = BudgetGatekeeper(budget_limit_usd=5.0)
@@ -168,28 +169,25 @@ class TestBudgetGatekeeper:
 
 class TestAuditLogger:
     async def test_logs_entry(self):
-        al = AuditLogger(backend="json", path="/dev/null")
+        al = AuditLogger()  # Uses LogAuditBackend by default
         ctx = ActionContext(action="test", agent_id="bot", vt_tier=1)
         result = await al.evaluate(ctx)
         assert result.action == Verdict.ALLOW
         assert len(al.entries) == 1
         assert al.entries[0].action == "test"
 
-    async def test_json_file_written(self):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            path = f.name
-
-        al = AuditLogger(backend="json", path=path)
+    async def test_entry_fields(self):
+        al = AuditLogger()
         ctx = ActionContext(action="audit_test", agent_id="bot", vt_tier=0)
         await al.evaluate(ctx)
-
-        content = Path(path).read_text()
-        record = json.loads(content.strip())
-        assert record["action"] == "audit_test"
-        assert record["agent_id"] == "bot"
+        entry = al.entries[0]
+        assert entry.action == "audit_test"
+        assert entry.agent_id == "bot"
+        assert entry.vt_tier == 0
+        assert entry.verdict == "checked"
 
     async def test_multiple_entries(self):
-        al = AuditLogger(backend="json", path="/dev/null")
+        al = AuditLogger()
         for i in range(5):
             ctx = ActionContext(action=f"action_{i}", agent_id="bot")
             await al.evaluate(ctx)

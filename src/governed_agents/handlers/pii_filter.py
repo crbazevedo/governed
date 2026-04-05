@@ -1,77 +1,74 @@
-"""PIIFilter handler -- detects and redacts PII patterns in payloads.
+"""PIIFilter handler -- detects and redacts PII in payloads.
 
-Delegates all PII scanning and redaction to the centralized ``pii`` module
-so that field-name-based and regex-based redaction are consistent across
-PIIFilter and UXHandler.
+# Layer: Static (stateless governance handler)
+
+Accepts a pluggable PIIDetector backend. Built-in RegexPIIDetector
+is used by default (zero external deps). For production, plug in
+Presidio, AWS Comprehend, Google DLP, or any PIIDetector implementation.
 """
 
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
+from dataclasses import replace
 
 from governed_agents.handler import (
     ActionContext,
     GovernanceHandler,
     GovernanceResult,
 )
-from governed_agents.pii import redact_payload
+from governed_agents.interfaces import PIIDetector
+from governed_agents.pii import RegexPIIDetector
 
 logger = logging.getLogger(__name__)
 
 
 class PIIFilter(GovernanceHandler):
-    """Checks for PII patterns in outbound payloads.
+    """Checks for PII in outbound payloads using a pluggable detector.
 
-    Scans all string values in the payload dict for PII patterns
-    (SSN, CPF, email, credit card, phone) using the centralized pii module.
-    If PII is found, returns MODIFY with the PII redacted, or BLOCK if
-    redaction is disabled.
-
-    Attributes:
-        patterns: Optional list of additional regex pattern strings.
+    Args:
+        detector: PIIDetector implementation. Defaults to RegexPIIDetector.
         redact: If True, redact PII and continue. If False, block on PII.
-        redaction_marker: String to replace PII matches with.
     """
 
     def __init__(
         self,
-        patterns: list[str] | None = None,
+        detector: PIIDetector | None = None,
         redact: bool = True,
+        # Convenience: extra regex patterns forwarded to default detector
+        patterns: list[str] | None = None,
         redaction_marker: str = "[REDACTED]",
     ) -> None:
-        self._extra_patterns = patterns
+        if detector is not None:
+            self._detector = detector
+        else:
+            self._detector = RegexPIIDetector(
+                extra_patterns=patterns,
+                redaction_marker=redaction_marker,
+            )
         self._redact = redact
-        self._redaction_marker = redaction_marker
 
     @property
     def name(self) -> str:
         return "pii_filter"
 
     async def evaluate(self, context: ActionContext) -> GovernanceResult:
-        original_payload = context.payload
-        redacted_payload = redact_payload(
-            original_payload,
-            extra_patterns=self._extra_patterns,
-            redaction_marker=self._redaction_marker,
-        )
+        matches = self._detector.scan(context.payload)
 
-        pii_found = redacted_payload != original_payload
-
-        if not pii_found:
+        if not matches:
             return GovernanceResult.continue_(handler_name=self.name)
 
         if not self._redact:
             return GovernanceResult.abort(
                 handler_name=self.name,
-                reason="PII detected in payload (redaction disabled)",
+                reason=f"PII detected in payload ({len(matches)} matches, redaction disabled)",
             )
 
-        from dataclasses import replace
+        redacted_payload = self._detector.redact(context.payload)
         new_context = replace(context, payload=redacted_payload)
-        logger.warning("PIIFilter: PII detected and redacted in payload")
+        logger.warning("PIIFilter: %d PII matches detected and redacted", len(matches))
         return GovernanceResult.modify(
             modified_context=new_context,
             handler_name=self.name,
-            reason="PII detected and redacted",
+            reason=f"PII detected and redacted ({len(matches)} matches)",
         )

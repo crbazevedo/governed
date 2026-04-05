@@ -20,10 +20,10 @@ dependencies = [
 
 [project.optional-dependencies]
 amo = ["minimal-oversight>=0.1.0"]
-redis = ["redis>=5.0"]
+presidio = ["presidio-analyzer>=2.2", "presidio-anonymizer>=2.2"]
 viz = ["rich>=13.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
-all = ["governed-agents[amo,redis,viz,dev]"]
+all = ["governed-agents[amo,viz,dev]"]
 
 [build-system]
 requires = ["setuptools>=68.0"]

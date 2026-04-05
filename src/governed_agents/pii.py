@@ -1,18 +1,14 @@
-"""PII redaction utilities for event payloads.
+"""PII detection and redaction — built-in regex implementation.
 
-This is the **single PII engine** for the governed-agents package.
-Both ``PIIFilter`` handler and ``UXHandler`` delegate to ``redact_payload()``
-so that field-name-based redaction, regex-based pattern matching, and
-configurable extra patterns are applied consistently everywhere.
+# Layer: Static (stateless, zero external dependencies)
 
-Design:
-  - ``redact_payload`` returns a **new** dict; the original is never mutated.
-  - Structured fields (known PII keys) get full value replacement.
-  - Free-text fields get regex-based pattern matching from two sources:
-      1. Built-in patterns (email, phone) always active.
-      2. ``config.DEFAULT_PII_PATTERNS`` for SSN, CPF, credit card, etc.
-  - Callers may pass ``extra_patterns`` for additional regex strings.
-  - No external NLP libraries; pure regex.
+Provides ``RegexPIIDetector``, the built-in implementation of the
+``PIIDetector`` interface. Uses regex patterns for PII detection.
+For production NLP-based detection, plug in Presidio, AWS Comprehend,
+or Google DLP via the ``PIIDetector`` ABC in ``interfaces.py``.
+
+The ``redact_payload()`` convenience function is preserved for backward
+compatibility and for ``UXHandler``'s inline PII scrub.
 """
 
 from __future__ import annotations
@@ -22,6 +18,7 @@ import re
 from typing import Any
 
 from governed_agents.config import DEFAULT_PII_PATTERNS
+from governed_agents.interfaces import PIIDetector, PIIMatch
 
 # ──────────────────────────────────────────────
 # Known PII field names (Tier 1 & Tier 2)
@@ -161,3 +158,75 @@ def redact_payload(
         k: _redact_value(k, v, extra_compiled, redaction_marker)
         for k, v in safe.items()
     }
+
+
+# ──────────────────────────────────────────────
+# RegexPIIDetector — built-in PIIDetector implementation
+# ──────────────────────────────────────────────
+
+
+class RegexPIIDetector(PIIDetector):
+    """Built-in regex-based PII detector. Zero external dependencies.
+
+    Good enough for demos, testing, and simple deployments. For production
+    NLP-based detection, implement ``PIIDetector`` with Presidio, AWS
+    Comprehend, Google DLP, or spaCy NER.
+
+    Args:
+        extra_patterns: Additional regex pattern strings to match.
+        redaction_marker: String to replace matches with.
+    """
+
+    def __init__(
+        self,
+        extra_patterns: list[str] | None = None,
+        redaction_marker: str = _FIELD_PLACEHOLDER,
+    ) -> None:
+        self._extra_patterns = extra_patterns
+        self._redaction_marker = redaction_marker
+
+    def scan(self, payload: dict[str, Any]) -> list[PIIMatch]:
+        """Scan payload for PII. Returns list of matches."""
+        original = payload
+        redacted = redact_payload(
+            original,
+            extra_patterns=self._extra_patterns,
+            redaction_marker=self._redaction_marker,
+        )
+        matches: list[PIIMatch] = []
+        self._diff_payloads(original, redacted, "", matches)
+        return matches
+
+    def redact(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Return a new payload with PII redacted."""
+        return redact_payload(
+            payload,
+            extra_patterns=self._extra_patterns,
+            redaction_marker=self._redaction_marker,
+        )
+
+    def _diff_payloads(
+        self,
+        original: Any,
+        redacted: Any,
+        path: str,
+        matches: list[PIIMatch],
+    ) -> None:
+        """Recursively find differences between original and redacted payloads."""
+        if isinstance(original, dict) and isinstance(redacted, dict):
+            for key in original:
+                self._diff_payloads(
+                    original[key],
+                    redacted.get(key),
+                    f"{path}.{key}" if path else key,
+                    matches,
+                )
+        elif isinstance(original, list) and isinstance(redacted, list):
+            for i, (o, r) in enumerate(zip(original, redacted)):
+                self._diff_payloads(o, r, f"{path}[{i}]", matches)
+        elif original != redacted:
+            matches.append(PIIMatch(
+                field_path=path,
+                pattern_name="regex",
+                original_value=str(original)[:50] if original else "",
+            ))

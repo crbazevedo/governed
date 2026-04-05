@@ -1,11 +1,15 @@
 """Built-in governance pipeline handlers.
 
-Provides ready-to-use handlers for common governance concerns:
-- PIIFilter: detect and redact PII patterns in payloads
-- RateLimiter: enforce bounded concurrency with sliding windows
-- BudgetGatekeeper: enforce cumulative cost limits
-- AuditLogger: log all actions to a JSON file or Redis stream
-- ComplianceChecker: validate payload size, VT consistency, audit readiness
+Each handler uses a pluggable backend via the interfaces in ``interfaces.py``.
+Built-in defaults require zero external deps. Swap in production backends
+(Presidio, Redis, litellm, etc.) via constructor injection.
+
+Handlers:
+- PIIFilter: detect/redact PII (default: RegexPIIDetector; plug in Presidio)
+- RateLimiter: enforce action frequency (default: InMemoryRateLimit; plug in Redis)
+- BudgetGatekeeper: enforce cost limits (default: ManualCostTracker; plug in litellm)
+- AuditLogger: log decisions (default: LogAuditBackend; plug in file/Redis/SIEM)
+- ComplianceChecker: validate payload size, VT consistency
 - UXHandler: format VT2+ actions as HITL messages
 """
 

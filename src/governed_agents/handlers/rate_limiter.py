@@ -1,76 +1,91 @@
-"""RateLimiter handler -- enforces bounded concurrency with sliding windows."""
+"""RateLimiter handler -- enforces action frequency limits.
+
+# Layer: Dynamic (stateful, in-memory by default)
+
+Accepts a pluggable RateLimitPolicy backend. Built-in InMemoryRateLimit
+is used by default (sliding window, single-process). For distributed
+systems, plug in a Redis-backed or API gateway rate limiter.
+"""
 
 from __future__ import annotations
 
 import logging
 import time
 
-from governed_agents.config import RATE_LIMIT_MAX_CONCURRENT, RATE_LIMIT_WINDOW_S
 from governed_agents.handler import (
     ActionContext,
     GovernanceHandler,
     GovernanceResult,
 )
+from governed_agents.interfaces import RateLimitPolicy
 
 logger = logging.getLogger(__name__)
 
 
+class InMemoryRateLimit(RateLimitPolicy):
+    """Built-in sliding window rate limiter. Single-process only.
+
+    For distributed rate limiting, implement ``RateLimitPolicy``
+    with Redis, a token bucket, or your API gateway's rate limiter.
+    """
+
+    def __init__(self, max_per_window: int = 5, window_seconds: int = 60) -> None:
+        self._max = max_per_window
+        self._window = window_seconds
+        self._timestamps: dict[str, list[float]] = {}
+
+    async def check(self, agent_id: str, action: str) -> bool:
+        now = time.time()
+        cutoff = now - self._window
+        key = agent_id or "__global__"
+        ts = self._timestamps.get(key, [])
+        ts = [t for t in ts if t > cutoff]
+        self._timestamps[key] = ts
+        return len(ts) < self._max
+
+    async def record(self, agent_id: str, action: str) -> None:
+        key = agent_id or "__global__"
+        self._timestamps.setdefault(key, []).append(time.time())
+
+
 class RateLimiter(GovernanceHandler):
-    """Enforces bounded concurrency for pipeline actions.
+    """Enforces action frequency limits via a pluggable policy.
 
-    Uses a sliding window counter to limit the number of actions
-    within a time window. Actions exceeding the limit are blocked.
-
-    Attributes:
-        max_per_window: Maximum actions allowed in the window.
-        window_seconds: Sliding window duration in seconds.
+    Args:
+        policy: RateLimitPolicy implementation. Defaults to InMemoryRateLimit.
+        max_per_window: Max actions in window (forwarded to default policy).
+        window_seconds: Window duration (forwarded to default policy).
     """
 
     def __init__(
         self,
-        max_per_window: int | None = None,
-        window_seconds: int | None = None,
-        # Backward-compatible alias
+        policy: RateLimitPolicy | None = None,
+        max_per_window: int = 5,
+        window_seconds: int = 60,
+        # Backward compat
         max_concurrent: int | None = None,
     ) -> None:
-        effective = max_per_window or max_concurrent or RATE_LIMIT_MAX_CONCURRENT
-        self._max_per_window = effective
-        self._window_seconds = window_seconds or RATE_LIMIT_WINDOW_S
-        self._timestamps: dict[str, list[float]] = {}
+        if policy is not None:
+            self._policy = policy
+        else:
+            effective_max = max_per_window if max_concurrent is None else max_concurrent
+            self._policy = InMemoryRateLimit(effective_max, window_seconds)
 
     @property
     def name(self) -> str:
         return "rate_limiter"
 
     async def evaluate(self, context: ActionContext) -> GovernanceResult:
-        now = time.time()
-        cutoff = now - self._window_seconds
-        agent_id = context.agent_id or "__global__"
+        allowed = await self._policy.check(context.agent_id, context.action)
 
-        # Get or create per-agent timestamp list
-        if agent_id not in self._timestamps:
-            self._timestamps[agent_id] = []
-
-        # Prune expired timestamps
-        self._timestamps[agent_id] = [
-            t for t in self._timestamps[agent_id] if t > cutoff
-        ]
-
-        if len(self._timestamps[agent_id]) >= self._max_per_window:
+        if not allowed:
             return GovernanceResult.abort(
                 handler_name=self.name,
-                reason=(
-                    f"Rate limit exceeded for {agent_id}: "
-                    f"{len(self._timestamps[agent_id])}/{self._max_per_window} "
-                    f"actions in {self._window_seconds}s window"
-                ),
+                reason=f"Rate limit exceeded for '{context.agent_id}'",
             )
 
-        self._timestamps[agent_id].append(now)
+        await self._policy.record(context.agent_id, context.action)
         return GovernanceResult.continue_(
             handler_name=self.name,
-            reason=(
-                f"Rate OK for {agent_id}: "
-                f"{len(self._timestamps[agent_id])}/{self._max_per_window}"
-            ),
+            reason=f"Rate OK for '{context.agent_id}'",
         )
