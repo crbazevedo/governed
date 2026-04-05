@@ -5,33 +5,28 @@ PII redaction, rate limiting, budget controls, and human-in-the-loop
 escalation for any Python agent framework.
 """
 
-from governed_agents.event import GovernedEvent
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
     ExecutionMode,
-    HandlerRegistration,
-    ResultAction,
+    GovernanceHandler,
+    GovernanceResult,
+    Verdict,
 )
 from governed_agents.hitl import HITLIntent, HITLMessage
-from governed_agents.pipeline import CallbackPipeline
-from governed_agents.vt import VTGovernanceHandler, VTPolicy, VTTier
+from governed_agents.pipeline import GovernancePipeline
+from governed_agents.vt import VTGovernanceHandler, VTTier
 
 __version__ = "0.1.0"
 
 __all__ = [
-    "CallbackContext",
-    "CallbackHandler",
-    "CallbackPipeline",
-    "CallbackResult",
+    "ActionContext",
     "ExecutionMode",
-    "GovernedEvent",
-    "HandlerRegistration",
+    "GovernanceHandler",
+    "GovernancePipeline",
+    "GovernanceResult",
     "HITLIntent",
     "HITLMessage",
-    "ResultAction",
+    "Verdict",
     "VTGovernanceHandler",
-    "VTPolicy",
     "VTTier",
 ]

@@ -22,9 +22,9 @@ from enum import IntEnum
 
 from governed_agents.config import VT_TIERS
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
+    GovernanceHandler,
+    GovernanceResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class VTPolicy:
         ))
 
 
-class VTGovernanceHandler(CallbackHandler):
+class VTGovernanceHandler(GovernanceHandler):
     """Validates actions against VT tier governance rules.
 
     VT tier enforcement:
@@ -122,12 +122,12 @@ class VTGovernanceHandler(CallbackHandler):
     def name(self) -> str:
         return "vt_governance"
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         vt = context.vt_tier
         tier_policy = VT_TIERS.get(vt, "block")
 
         if tier_policy == "auto":
-            return CallbackResult.continue_(
+            return GovernanceResult.continue_(
                 handler_name=self.name,
                 reason=f"VT{vt}: auto-approved -- no restrictions",
             )
@@ -142,7 +142,7 @@ class VTGovernanceHandler(CallbackHandler):
                 "VTGovernance: VT%d action '%s' by '%s' -- logged for review",
                 vt, context.action, context.agent_id,
             )
-            return CallbackResult.modify(
+            return GovernanceResult.modify(
                 modified_context=new_context,
                 handler_name=self.name,
                 reason=f"VT{vt}: allowed with review flag",
@@ -153,12 +153,12 @@ class VTGovernanceHandler(CallbackHandler):
                 new_context = deepcopy(context)
                 new_context.metadata["governance_approval_verified"] = True
                 new_context.metadata["governance_vt_tier"] = vt
-                return CallbackResult.modify(
+                return GovernanceResult.modify(
                     modified_context=new_context,
                     handler_name=self.name,
                     reason=f"VT{vt}: pre-approved by owner",
                 )
-            return CallbackResult.abort(
+            return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=(
                     f"VT{vt}: requires owner approval. "
@@ -168,7 +168,7 @@ class VTGovernanceHandler(CallbackHandler):
             )
 
         if tier_policy == "advise":
-            return CallbackResult.abort(
+            return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=(
                     f"VT{vt}: agent may only advise, not act. "
@@ -178,7 +178,7 @@ class VTGovernanceHandler(CallbackHandler):
             )
 
         # VT4 or unknown -- always block
-        return CallbackResult.abort(
+        return GovernanceResult.abort(
             handler_name=self.name,
             reason=(
                 f"VT{vt}: owner-only action -- blocked. "

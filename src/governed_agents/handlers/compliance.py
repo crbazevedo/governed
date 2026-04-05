@@ -8,15 +8,15 @@ from typing import Any
 
 from governed_agents.config import MAX_PAYLOAD_SIZE_KB
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
+    GovernanceHandler,
+    GovernanceResult,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class ComplianceChecker(CallbackHandler):
+class ComplianceChecker(GovernanceHandler):
     """Validates that the action output meets governance standards.
 
     Checks performed:
@@ -42,7 +42,7 @@ class ComplianceChecker(CallbackHandler):
     def name(self) -> str:
         return "compliance_checker"
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         violations: list[str] = []
 
         # Check 1: Payload size
@@ -74,7 +74,7 @@ class ComplianceChecker(CallbackHandler):
             )
 
         if not violations:
-            return CallbackResult.continue_(
+            return GovernanceResult.continue_(
                 handler_name=self.name,
                 reason="All compliance checks passed",
             )
@@ -82,7 +82,7 @@ class ComplianceChecker(CallbackHandler):
         violation_msg = "; ".join(violations)
 
         if self._strict_mode:
-            return CallbackResult.abort(
+            return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=f"Compliance violations: {violation_msg}",
             )
@@ -93,7 +93,7 @@ class ComplianceChecker(CallbackHandler):
         )
         new_context = deepcopy(context)
         new_context.metadata["compliance_warnings"] = violations
-        return CallbackResult.modify(
+        return GovernanceResult.modify(
             modified_context=new_context,
             handler_name=self.name,
             reason=f"Compliance warnings (non-strict): {violation_msg}",

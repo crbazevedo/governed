@@ -21,20 +21,20 @@ pip install governed-agents[all]     # Everything
 
 ```python
 import asyncio
-from governed_agents import CallbackPipeline, CallbackContext, VTGovernanceHandler
+from governed_agents import GovernancePipeline, ActionContext, VTGovernanceHandler
 from governed_agents.handlers import PIIFilter, AuditLogger, RateLimiter
 
 async def main():
-    pipeline = CallbackPipeline()
-    pipeline.register(PIIFilter(), priority=10)
-    pipeline.register(RateLimiter(max_concurrent=3), priority=10)
-    pipeline.register(VTGovernanceHandler(), priority=20)
-    pipeline.register(AuditLogger(backend="json", path="audit.jsonl"), priority=40, optional=True)
+    pipeline = GovernancePipeline()
+    pipeline.add(PIIFilter())
+    pipeline.add(RateLimiter(max_per_window=3))
+    pipeline.add(VTGovernanceHandler())
+    pipeline.add(AuditLogger(backend="json", path="audit.jsonl"), optional=True)
 
-    ctx = CallbackContext(action="send_email", agent_id="assistant", vt_tier=2,
-                          payload={"to": "client@corp.com", "body": "Proposal"})
+    ctx = ActionContext(action="send_email", agent_id="assistant", vt_tier=2,
+                        payload={"to": "client@corp.com", "body": "Proposal"})
     result = await pipeline.execute(ctx)
-    print(result.action)  # "abort" -- VT2 requires human approval
+    print(result.action)  # "block" -- VT2 requires human approval
 
 asyncio.run(main())
 ```
@@ -69,15 +69,15 @@ The Verified Trust (VT) tier system controls agent autonomy:
 
 ```python
 from pydantic_ai import Agent
-from governed_agents import CallbackPipeline, CallbackContext, VTGovernanceHandler
+from governed_agents import GovernancePipeline, ActionContext, VTGovernanceHandler
 
-pipeline = CallbackPipeline()
-pipeline.register(VTGovernanceHandler(), priority=20)
+pipeline = GovernancePipeline()
+pipeline.add(VTGovernanceHandler())
 
 @agent.tool
 async def governed_tool(ctx):
-    result = await pipeline.execute(CallbackContext(action="tool_call", vt_tier=1))
-    if result.action.value == "abort":
+    result = await pipeline.execute(ActionContext(action="tool_call", vt_tier=1))
+    if result.action.value == "block":
         return f"Blocked: {result.reason}"
     # ... proceed with tool logic
 ```
@@ -86,14 +86,14 @@ async def governed_tool(ctx):
 
 ```python
 from langgraph.graph import StateGraph
-from governed_agents import CallbackPipeline, CallbackContext, VTGovernanceHandler
+from governed_agents import GovernancePipeline, ActionContext, VTGovernanceHandler
 
-pipeline = CallbackPipeline()
-pipeline.register(VTGovernanceHandler(), priority=20)
+pipeline = GovernancePipeline()
+pipeline.add(VTGovernanceHandler())
 
 async def governance_node(state):
     result = await pipeline.execute(
-        CallbackContext(action=state["action"], vt_tier=state.get("vt_tier", 1))
+        ActionContext(action=state["action"], vt_tier=state.get("vt_tier", 1))
     )
     return {**state, "governance_result": result.action.value}
 ```
@@ -102,43 +102,45 @@ async def governance_node(state):
 
 ```python
 from crewai import Task
-from governed_agents import CallbackPipeline, CallbackContext, VTGovernanceHandler
+from governed_agents import GovernancePipeline, ActionContext, VTGovernanceHandler
 
-pipeline = CallbackPipeline()
-pipeline.register(VTGovernanceHandler(), priority=20)
+pipeline = GovernancePipeline()
+pipeline.add(VTGovernanceHandler())
 
 async def governed_task_callback(output):
     result = await pipeline.execute(
-        CallbackContext(action="task_output", vt_tier=1, payload={"output": str(output)})
+        ActionContext(action="task_output", vt_tier=1, payload={"output": str(output)})
     )
-    return result.action.value != "abort"
+    return result.action.value != "block"
 ```
 
 ## Custom Handlers
 
 ```python
-from governed_agents import CallbackHandler, CallbackContext, CallbackResult
+from governed_agents import GovernanceHandler, ActionContext, GovernanceResult
 
-class MyCustomHandler(CallbackHandler):
+class MyCustomHandler(GovernanceHandler):
     @property
     def name(self) -> str:
         return "my_handler"
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         if context.payload.get("sensitive"):
-            return CallbackResult.abort(handler_name=self.name, reason="Sensitive data detected")
-        return CallbackResult.continue_(handler_name=self.name)
+            return GovernanceResult.abort(handler_name=self.name, reason="Sensitive data detected")
+        return GovernanceResult.continue_(handler_name=self.name)
 
-pipeline.register(MyCustomHandler(), priority=25)
+pipeline.add(MyCustomHandler())
 ```
 
 ## Pipeline Features
 
 - **Priority-ordered groups**: Handlers execute in priority order (lower first)
+- **Auto-priority via `add()`**: Handlers get auto-assigned priority (increments of 10)
+- **Explicit priority via `register()`**: Full control over execution order
 - **Mixed execution**: Parallel within groups, sequential across groups
-- **Abort short-circuit**: Any handler can halt the entire pipeline
+- **Block short-circuit**: Any handler can halt the entire pipeline
 - **Context chaining**: Handlers can modify context for downstream handlers
-- **Graceful degradation**: Optional handlers fail silently; required handlers abort on error
+- **Graceful degradation**: Optional handlers fail silently; required handlers block on error
 - **Dependency resolution**: Handlers can declare dependencies on other handlers
 
 ## Optional: AMO Integration

@@ -1,11 +1,11 @@
-"""Callback pipeline for multi-handler governance enforcement.
+"""Governance pipeline for multi-handler enforcement.
 
 Implements the middleware chain pattern supporting:
 - Priority-ordered handler groups
 - Mixed parallel/sequential execution within groups
 - Graceful degradation (handler failures logged, not propagated)
 - Context modification chaining (sequential handlers can transform context)
-- Abort short-circuiting (any handler can halt the pipeline)
+- Block short-circuiting (any handler can halt the pipeline)
 
 Handler dependency graph example:
     Priority 10 (parallel):  PIIFilter + RateLimiter
@@ -20,31 +20,31 @@ import asyncio
 import logging
 
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
     ExecutionMode,
+    GovernanceHandler,
+    GovernanceResult,
     HandlerRegistration,
-    ResultAction,
+    Verdict,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class CallbackPipeline:
-    """Ordered middleware chain for governance callbacks.
+class GovernancePipeline:
+    """Ordered middleware chain for governance evaluation.
 
     Supports mixed sequential/parallel execution:
     - Handlers are grouped by priority level.
     - Within a group, if ALL handlers are PARALLEL, they fan out concurrently.
     - Otherwise, handlers run sequentially in registration order.
-    - Any handler returning ABORT halts the entire pipeline.
+    - Any handler returning BLOCK halts the entire pipeline.
     - Handlers returning MODIFY transform the context for downstream handlers.
 
     Graceful degradation:
     - Handler exceptions are logged as warnings, not propagated.
     - Optional handlers (audit, metrics) are skipped on failure.
-    - Non-optional handler failures are treated as ABORT with a warning.
+    - Non-optional handler failures are treated as BLOCK with a warning.
     """
 
     def __init__(self) -> None:
@@ -52,13 +52,13 @@ class CallbackPipeline:
 
     def register(
         self,
-        handler: CallbackHandler,
+        handler: GovernanceHandler,
         priority: int = 100,
         mode: ExecutionMode = ExecutionMode.SEQUENTIAL,
         optional: bool = False,
         depends_on: frozenset[str] | None = None,
     ) -> None:
-        """Register a handler in the pipeline.
+        """Register a handler in the pipeline with explicit priority.
 
         Args:
             handler: The handler to register.
@@ -79,6 +79,31 @@ class CallbackPipeline:
         # Keep sorted by priority for deterministic execution
         self._registrations.sort(key=lambda r: r.priority)
 
+    def add(
+        self,
+        handler: GovernanceHandler,
+        *,
+        optional: bool = False,
+        mode: ExecutionMode = ExecutionMode.SEQUENTIAL,
+    ) -> None:
+        """Add a handler with auto-assigned priority.
+
+        Priority is auto-incremented by 10 from the last registered handler's
+        priority, starting at 10 if the pipeline is empty.
+
+        Args:
+            handler: The handler to add.
+            optional: If True, failure does not affect the pipeline verdict.
+            mode: Sequential or parallel execution.
+        """
+        if self._registrations:
+            last_priority = self._registrations[-1].priority
+            priority = last_priority + 10
+        else:
+            priority = 10
+
+        self.register(handler, priority=priority, mode=mode, optional=optional)
+
     @property
     def handlers(self) -> list[HandlerRegistration]:
         """Return the registered handlers in priority order."""
@@ -95,7 +120,7 @@ class CallbackPipeline:
             groups.setdefault(reg.priority, []).append(reg)
         return sorted(groups.items(), key=lambda x: x[0])
 
-    async def execute(self, context: CallbackContext) -> CallbackResult:
+    async def execute(self, context: ActionContext) -> GovernanceResult:
         """Execute the pipeline against the given context.
 
         Processes handlers group-by-group in priority order:
@@ -103,15 +128,15 @@ class CallbackPipeline:
            in a prior group are deferred to the next group.
         2. All-parallel groups fan out concurrently via asyncio.gather.
         3. Sequential groups run handlers one at a time.
-        4. ABORT from any handler halts the pipeline immediately.
+        4. BLOCK from any handler halts the pipeline immediately.
         5. MODIFY updates the context for downstream handlers.
         6. Exceptions are caught and logged (graceful degradation).
 
         Args:
-            context: The callback context to evaluate.
+            context: The action context to evaluate.
 
         Returns:
-            Final CallbackResult -- CONTINUE if all passed, or the first ABORT.
+            Final GovernanceResult -- ALLOW if all passed, or the first BLOCK.
         """
         groups = self._group_by_priority()
         completed_handlers: set[str] = set()
@@ -163,34 +188,34 @@ class CallbackPipeline:
             if result is None:
                 continue
 
-            if result.action == ResultAction.ABORT:
+            if result.action == Verdict.BLOCK:
                 return result
 
-            if result.action == ResultAction.MODIFY and result.modified_context is not None:
+            if result.action == Verdict.MODIFY and result.modified_context is not None:
                 context = result.modified_context
 
-        return CallbackResult.continue_(reason="All handlers passed")
+        return GovernanceResult.continue_(reason="All handlers passed")
 
     async def _execute_parallel(
         self,
         group: list[HandlerRegistration],
-        context: CallbackContext,
-    ) -> CallbackResult | None:
+        context: ActionContext,
+    ) -> GovernanceResult | None:
         """Execute a parallel group of handlers concurrently.
 
-        Returns the first ABORT result, or the last MODIFY, or None if all CONTINUE.
+        Returns the first BLOCK result, or the last MODIFY, or None if all ALLOW.
         """
         tasks = [self._safe_check(reg, context) for reg in group]
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
-        last_modify: CallbackResult | None = None
+        last_modify: GovernanceResult | None = None
 
         for result in results:
             if result is None:
                 continue
-            if result.action == ResultAction.ABORT:
+            if result.action == Verdict.BLOCK:
                 return result
-            if result.action == ResultAction.MODIFY:
+            if result.action == Verdict.MODIFY:
                 last_modify = result
 
         return last_modify
@@ -198,24 +223,24 @@ class CallbackPipeline:
     async def _execute_sequential(
         self,
         group: list[HandlerRegistration],
-        context: CallbackContext,
-    ) -> CallbackResult | None:
+        context: ActionContext,
+    ) -> GovernanceResult | None:
         """Execute a sequential group of handlers one at a time.
 
         Context modifications are chained: each MODIFY updates the context
         for the next handler in the group.
 
-        Returns the first ABORT result, or the last MODIFY, or None if all CONTINUE.
+        Returns the first BLOCK result, or the last MODIFY, or None if all ALLOW.
         """
-        last_modify: CallbackResult | None = None
+        last_modify: GovernanceResult | None = None
 
         for reg in group:
             result = await self._safe_check(reg, context)
             if result is None:
                 continue
-            if result.action == ResultAction.ABORT:
+            if result.action == Verdict.BLOCK:
                 return result
-            if result.action == ResultAction.MODIFY and result.modified_context is not None:
+            if result.action == Verdict.MODIFY and result.modified_context is not None:
                 context = result.modified_context
                 last_modify = result
 
@@ -224,15 +249,15 @@ class CallbackPipeline:
     async def _safe_check(
         self,
         reg: HandlerRegistration,
-        context: CallbackContext,
-    ) -> CallbackResult | None:
+        context: ActionContext,
+    ) -> GovernanceResult | None:
         """Execute a single handler with graceful degradation.
 
         Catches exceptions and logs them. Optional handlers return None on failure.
-        Non-optional handler failures abort the pipeline to prevent silent bypass.
+        Non-optional handler failures block the pipeline to prevent silent bypass.
         """
         try:
-            return await reg.handler.check(context)
+            return await reg.handler.evaluate(context)
         except Exception:
             if reg.optional:
                 logger.warning(
@@ -243,11 +268,15 @@ class CallbackPipeline:
                 return None
             else:
                 logger.error(
-                    "Non-optional handler '%s' failed -- aborting pipeline: ",
+                    "Non-optional handler '%s' failed -- blocking pipeline: ",
                     reg.handler.name,
                     exc_info=True,
                 )
-                return CallbackResult.abort(
+                return GovernanceResult.abort(
                     handler_name=reg.handler.name,
                     reason=f"Handler '{reg.handler.name}' raised an exception",
                 )
+
+
+# Backward-compatible alias (not exported in __init__.py)
+CallbackPipeline = GovernancePipeline

@@ -12,9 +12,9 @@ import logging
 from copy import deepcopy
 
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
+    GovernanceHandler,
+    GovernanceResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ except ImportError:
     PipelineGraph = None
 
 
-class DynamicVTHandler(CallbackHandler):
+class DynamicVTHandler(GovernanceHandler):
     """Replace static VT tier assignment with AMO water-filling optimization.
 
     When minimal-oversight is available, analyzes the pipeline graph and
@@ -58,19 +58,19 @@ class DynamicVTHandler(CallbackHandler):
     def name(self) -> str:
         return "dynamic_vt"
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         if not HAS_AMO:
             if self._fallback_tier is not None:
                 new_context = deepcopy(context)
                 new_context.vt_tier = self._fallback_tier
-                return CallbackResult.modify(
+                return GovernanceResult.modify(
                     modified_context=new_context,
                     handler_name=self.name,
                     reason=(
                         f"AMO not available, using fallback VT{self._fallback_tier}"
                     ),
                 )
-            return CallbackResult.continue_(
+            return GovernanceResult.continue_(
                 handler_name=self.name,
                 reason="AMO not available, keeping original VT tier",
             )
@@ -93,7 +93,7 @@ class DynamicVTHandler(CallbackHandler):
                 new_context.vt_tier = optimized_tier
                 new_context.metadata["amo_original_vt"] = context.vt_tier
                 new_context.metadata["amo_optimized_vt"] = optimized_tier
-                return CallbackResult.modify(
+                return GovernanceResult.modify(
                     modified_context=new_context,
                     handler_name=self.name,
                     reason=(
@@ -101,14 +101,14 @@ class DynamicVTHandler(CallbackHandler):
                     ),
                 )
 
-            return CallbackResult.continue_(
+            return GovernanceResult.continue_(
                 handler_name=self.name,
                 reason=f"AMO confirms VT{context.vt_tier} is optimal",
             )
 
         except Exception as exc:
             logger.warning("DynamicVTHandler: AMO analysis failed: %s", exc)
-            return CallbackResult.continue_(
+            return GovernanceResult.continue_(
                 handler_name=self.name,
                 reason=f"AMO analysis failed, keeping VT{context.vt_tier}",
             )

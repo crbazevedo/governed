@@ -6,15 +6,15 @@ import logging
 from typing import Callable
 
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
+    GovernanceHandler,
+    GovernanceResult,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class BudgetGatekeeper(CallbackHandler):
+class BudgetGatekeeper(GovernanceHandler):
     """Enforces cumulative API budget limits across all agent invocations.
 
     Accepts a cost_callback callable that returns the current cumulative
@@ -39,19 +39,19 @@ class BudgetGatekeeper(CallbackHandler):
     def name(self) -> str:
         return "budget_gatekeeper"
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         if self._cost_callback is not None:
             current = self._cost_callback()
         else:
             current = context.metadata.get("current_cost_usd", self._cumulative_cost)
 
         if current >= self._budget_limit:
-            return CallbackResult.abort(
+            return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=f"Budget exceeded: ${current:.2f} >= ${self._budget_limit:.2f}",
             )
 
-        return CallbackResult.continue_(
+        return GovernanceResult.continue_(
             handler_name=self.name,
             reason=f"Budget OK: ${current:.2f} / ${self._budget_limit:.2f}",
         )

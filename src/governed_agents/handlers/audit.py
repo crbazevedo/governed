@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
+    GovernanceHandler,
+    GovernanceResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class AuditEntry:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-class AuditLogger(CallbackHandler):
+class AuditLogger(GovernanceHandler):
     """Logs all actions to an audit trail.
 
     Supports two backends:
@@ -75,7 +75,7 @@ class AuditLogger(CallbackHandler):
         """Return all audit entries (for testing/inspection)."""
         return list(self._entries)
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         entry = AuditEntry(
             timestamp=time.time(),
             action=context.action,
@@ -97,7 +97,7 @@ class AuditLogger(CallbackHandler):
             context.agent_id,
             context.vt_tier,
         )
-        return CallbackResult.continue_(handler_name=self.name, reason="Audit logged")
+        return GovernanceResult.continue_(handler_name=self.name, reason="Audit logged")
 
     def _write_json(self, entry: AuditEntry) -> None:
         """Append an audit entry to the JSON lines file."""

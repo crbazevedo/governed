@@ -7,9 +7,9 @@ import uuid
 from dataclasses import replace
 
 from governed_agents.handler import (
-    CallbackContext,
-    CallbackHandler,
-    CallbackResult,
+    ActionContext,
+    GovernanceHandler,
+    GovernanceResult,
 )
 from governed_agents.hitl import HITLIntent, HITLMessage
 from governed_agents.pii import redact_payload
@@ -17,7 +17,7 @@ from governed_agents.pii import redact_payload
 logger = logging.getLogger(__name__)
 
 
-class UXHandler(CallbackHandler):
+class UXHandler(GovernanceHandler):
     """Formats VT2+ pipeline actions as HITL DECISION_REQUESTED messages.
 
     Runs before VT governance so it can format the request. The governance
@@ -32,12 +32,12 @@ class UXHandler(CallbackHandler):
     def name(self) -> str:
         return "ux_handler"
 
-    async def check(self, context: CallbackContext) -> CallbackResult:
+    async def evaluate(self, context: ActionContext) -> GovernanceResult:
         vt = context.vt_tier
 
         # VT0-1: pass through without UX intervention
         if vt <= 1:
-            return CallbackResult.continue_(
+            return GovernanceResult.continue_(
                 handler_name=self.name,
                 reason=f"VT{vt}: no UX intervention needed",
             )
@@ -58,7 +58,7 @@ class UXHandler(CallbackHandler):
             f"{list(context.payload.keys()) if context.payload else 'none'}"
         )
 
-        # Scrub PII from composed message text (not just the payload)
+        # Scrub PII from composed message text using the centralized pii module
         scrubbed = redact_payload({"summary": summary, "body": body})
         summary = scrubbed["summary"]
         body = scrubbed["body"]
@@ -81,7 +81,7 @@ class UXHandler(CallbackHandler):
 
         modified = replace(context, metadata=new_metadata)
 
-        return CallbackResult.modify(
+        return GovernanceResult.modify(
             modified_context=modified,
             handler_name=self.name,
             reason=f"VT{vt} action formatted as {intent.value} HITL message",
