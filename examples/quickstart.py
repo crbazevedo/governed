@@ -1,5 +1,8 @@
 """Governed Agents -- Quick Start
 
+Demonstrates the core governance pipeline with PII filtering,
+rate limiting, VT tier enforcement, and audit logging.
+
 Run: python examples/quickstart.py
 """
 
@@ -8,49 +11,50 @@ import asyncio
 from governed_agents import (
     ActionContext,
     GovernancePipeline,
+    Verdict,
     VTGovernanceHandler,
 )
 from governed_agents.handlers import AuditLogger, PIIFilter, RateLimiter
 
 
 async def main():
-    # Create a governance pipeline
+    # Build a governance pipeline with four handlers
     pipeline = GovernancePipeline()
-    pipeline.add(PIIFilter())
-    pipeline.add(RateLimiter(max_per_window=3))
-    pipeline.add(VTGovernanceHandler())
-    pipeline.add(AuditLogger(backend="json", path="audit.jsonl"), optional=True)
+    pipeline.add(PIIFilter())                          # Redacts PII in payloads
+    pipeline.add(RateLimiter(max_per_window=3))        # Frequency limit
+    pipeline.add(VTGovernanceHandler())                 # VT tier enforcement
+    pipeline.add(AuditLogger(), optional=True)          # Audit log (optional)
 
-    # Simulate a VT1 action (auto-approve with logging)
-    ctx = ActionContext(
+    # --- VT1: agent acts, action is logged for review ---
+    ctx1 = ActionContext(
         action="send_notification",
         agent_id="assistant",
         vt_tier=1,
         payload={"to": "user@example.com", "body": "Meeting reminder"},
     )
-    result = await pipeline.execute(ctx)
-    print(f"VT1 action: {result.action.value}")  # -> allow
+    r1 = await pipeline.execute(ctx1)
+    print(f"VT1 action: {r1.action.value}")             # -> modify (PII redacted + review flag)
 
-    # Simulate a VT2 action (requires approval)
+    # --- VT2: requires human approval (blocked without it) ---
     ctx2 = ActionContext(
         action="send_email_to_client",
         agent_id="assistant",
         vt_tier=2,
         payload={"to": "client@corp.com", "body": "Proposal attached"},
     )
-    result2 = await pipeline.execute(ctx2)
-    print(f"VT2 action: {result2.action.value}")  # -> block (needs human approval)
-    print(f"  Reason: {result2.reason}")
+    r2 = await pipeline.execute(ctx2)
+    print(f"VT2 action: {r2.action.value}")             # -> block
+    print(f"  Reason: {r2.reason}")
 
-    # Simulate a VT0 action (fully autonomous)
+    # --- VT0: fully autonomous, no restrictions ---
     ctx3 = ActionContext(
         action="log_metric",
         agent_id="monitor",
         vt_tier=0,
         payload={"metric": "cpu_usage", "value": 42},
     )
-    result3 = await pipeline.execute(ctx3)
-    print(f"VT0 action: {result3.action.value}")  # -> allow
+    r3 = await pipeline.execute(ctx3)
+    print(f"VT0 action: {r3.action.value}")             # -> allow
 
 
 if __name__ == "__main__":
