@@ -5,7 +5,7 @@ description = "Governed autonomy middleware for AI agent systems"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [{name = "Carlos R. B. Azevedo", email = "carlos@carlosazevedo.com"}]
+authors = [{name = "Carlos R. B. Azevedo", email = "renatoaz@gmail.com"}]
 keywords = ["ai", "agents", "governance", "autonomy", "oversight", "hitl", "pii", "vt-tiers"]
 classifiers = [
     "Development Status :: 3 - Alpha",
