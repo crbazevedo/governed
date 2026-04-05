@@ -59,13 +59,24 @@ class ActionContext:
 
 @dataclass
 class GovernanceResult:
-    """Result returned by a handler evaluation."""
+    """Result returned by a handler evaluation.
+
+    For BLOCK results, ``suggestion`` and ``alternatives`` provide structured
+    recovery guidance that enables agents to self-repair -- adjusting their
+    approach rather than simply failing.  This beats opaque reason strings
+    because downstream code can programmatically inspect the alternatives
+    list and attempt automatic recovery.
+    """
 
     action: Verdict
     reason: str = ""
     handler_name: str = ""
     modified_context: ActionContext | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    suggestion: str = ""
+    """Actionable fix hint -- tells the agent exactly what to do to unblock."""
+    alternatives: list[str] = field(default_factory=list)
+    """Concrete things the agent could try instead of the blocked action."""
 
     @classmethod
     def continue_(cls, handler_name: str = "", reason: str = "") -> GovernanceResult:
@@ -73,9 +84,30 @@ class GovernanceResult:
         return cls(action=Verdict.ALLOW, handler_name=handler_name, reason=reason)
 
     @classmethod
-    def abort(cls, handler_name: str = "", reason: str = "") -> GovernanceResult:
-        """Factory for a BLOCK result."""
-        return cls(action=Verdict.BLOCK, handler_name=handler_name, reason=reason)
+    def abort(
+        cls,
+        handler_name: str = "",
+        reason: str = "",
+        suggestion: str = "",
+        alternatives: list[str] | None = None,
+    ) -> GovernanceResult:
+        """Factory for a BLOCK result with structured recovery guidance.
+
+        Args:
+            handler_name: Name of the handler that blocked the action.
+            reason: Human-readable explanation of why the action was blocked.
+            suggestion: Actionable hint for how the agent can fix the issue
+                        and retry successfully.
+            alternatives: List of concrete alternative approaches the agent
+                          could take instead.
+        """
+        return cls(
+            action=Verdict.BLOCK,
+            handler_name=handler_name,
+            reason=reason,
+            suggestion=suggestion,
+            alternatives=alternatives or [],
+        )
 
     @classmethod
     def modify(

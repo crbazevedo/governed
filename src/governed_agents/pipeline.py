@@ -6,6 +6,7 @@ Implements the middleware chain pattern supporting:
 - Graceful degradation (handler failures logged, not propagated)
 - Context modification chaining (sequential handlers can transform context)
 - Block short-circuiting (any handler can halt the pipeline)
+- Execution tracing for introspection and debugging
 
 Handler dependency graph example:
     Priority 10 (parallel):  PIIFilter + RateLimiter
@@ -18,6 +19,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from dataclasses import dataclass, field
 
 from governed_agents.handler import (
     ActionContext,
@@ -29,6 +32,56 @@ from governed_agents.handler import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ──────────────────────────────────────────────
+# Execution trace types
+# ──────────────────────────────────────────────
+
+
+@dataclass
+class HandlerTrace:
+    """Record of a single handler execution within the pipeline.
+
+    Captures the handler's verdict, timing, and recovery guidance --
+    enabling post-hoc analysis of why a pipeline reached its final verdict.
+    """
+
+    handler_name: str
+    verdict: Verdict
+    reason: str
+    duration_ms: float
+    suggestion: str = ""
+    alternatives: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ExecutionTrace:
+    """Full trace of a pipeline execution.
+
+    Provides complete introspection into what happened during a pipeline run:
+    which handlers ran, what each decided, how long each took, and what
+    recovery guidance is available.  This enables observability dashboards,
+    debugging, and automated recovery logic.
+    """
+
+    final_verdict: Verdict
+    final_reason: str
+    handler_traces: list[HandlerTrace]
+    total_duration_ms: float
+    context_modifications: int
+    suggestion: str = ""
+    alternatives: list[str] = field(default_factory=list)
+
+    @property
+    def summary(self) -> str:
+        """Human-readable one-line summary of the execution."""
+        handlers = ", ".join(h.handler_name for h in self.handler_traces)
+        return (
+            f"{self.final_verdict.value} "
+            f"({self.total_duration_ms:.1f}ms, "
+            f"{len(self.handler_traces)} handlers: {handlers})"
+        )
 
 
 class GovernancePipeline:
@@ -138,6 +191,55 @@ class GovernancePipeline:
         Returns:
             Final GovernanceResult -- ALLOW if all passed, or the first BLOCK.
         """
+        result, _, _ = await self._execute_internal(context)
+        return result
+
+    async def execute_traced(self, context: ActionContext) -> ExecutionTrace:
+        """Execute the pipeline and return a full execution trace.
+
+        Same semantics as ``execute()``, but returns an ``ExecutionTrace``
+        capturing per-handler timing, verdicts, and recovery guidance.
+        Use this for observability, debugging, or automated recovery logic.
+
+        Args:
+            context: The action context to evaluate.
+
+        Returns:
+            ExecutionTrace with the final verdict and per-handler details.
+        """
+        _, trace, _ = await self._execute_internal(context)
+        return trace
+
+    async def execute_with_context(
+        self, context: ActionContext
+    ) -> tuple[GovernanceResult, ActionContext]:
+        """Execute the pipeline and return both the result and final context.
+
+        Unlike ``execute()``, this method returns the (possibly modified)
+        context after all handlers have run.  Use this when you need to
+        access the transformed payload (e.g. after PII redaction).
+
+        Args:
+            context: The action context to evaluate.
+
+        Returns:
+            Tuple of (GovernanceResult, final ActionContext).
+        """
+        result, _, final_ctx = await self._execute_internal(context)
+        return result, final_ctx
+
+    async def _execute_internal(
+        self, context: ActionContext
+    ) -> tuple[GovernanceResult, ExecutionTrace, ActionContext]:
+        """Core pipeline execution with tracing.
+
+        Returns the GovernanceResult, ExecutionTrace, and the final
+        (possibly modified) ActionContext.
+        """
+        pipeline_start = time.perf_counter_ns()
+        handler_traces: list[HandlerTrace] = []
+        context_modifications = 0
+
         groups = self._group_by_priority()
         completed_handlers: set[str] = set()
 
@@ -175,11 +277,13 @@ class GovernancePipeline:
             all_parallel = all(r.mode == ExecutionMode.PARALLEL for r in ready)
 
             if all_parallel and len(ready) > 1:
-                # Fan out concurrently
-                result = await self._execute_parallel(ready, context)
+                result = await self._execute_parallel_traced(
+                    ready, context, handler_traces
+                )
             else:
-                # Sequential execution
-                result = await self._execute_sequential(ready, context)
+                result = await self._execute_sequential_traced(
+                    ready, context, handler_traces
+                )
 
             # Track completed handler names
             for reg in ready:
@@ -189,28 +293,47 @@ class GovernancePipeline:
                 continue
 
             if result.action == Verdict.BLOCK:
-                return result
+                total_ms = (time.perf_counter_ns() - pipeline_start) / 1_000_000
+                trace = ExecutionTrace(
+                    final_verdict=Verdict.BLOCK,
+                    final_reason=result.reason,
+                    handler_traces=handler_traces,
+                    total_duration_ms=total_ms,
+                    context_modifications=context_modifications,
+                    suggestion=result.suggestion,
+                    alternatives=list(result.alternatives),
+                )
+                return result, trace, context
 
             if result.action == Verdict.MODIFY and result.modified_context is not None:
                 context = result.modified_context
+                context_modifications += 1
 
-        return GovernanceResult.continue_(reason="All handlers passed")
+        final = GovernanceResult.continue_(reason="All handlers passed")
+        total_ms = (time.perf_counter_ns() - pipeline_start) / 1_000_000
+        trace = ExecutionTrace(
+            final_verdict=Verdict.ALLOW,
+            final_reason=final.reason,
+            handler_traces=handler_traces,
+            total_duration_ms=total_ms,
+            context_modifications=context_modifications,
+        )
+        return final, trace, context
 
-    async def _execute_parallel(
+    async def _execute_parallel_traced(
         self,
         group: list[HandlerRegistration],
         context: ActionContext,
+        handler_traces: list[HandlerTrace],
     ) -> GovernanceResult | None:
-        """Execute a parallel group of handlers concurrently.
-
-        Returns the first BLOCK result, or the last MODIFY, or None if all ALLOW.
-        """
-        tasks = [self._safe_check(reg, context) for reg in group]
+        """Execute a parallel group concurrently, recording traces."""
+        tasks = [self._safe_check_traced(reg, context) for reg in group]
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
         last_modify: GovernanceResult | None = None
 
-        for result in results:
+        for result, htrace in results:
+            handler_traces.append(htrace)
             if result is None:
                 continue
             if result.action == Verdict.BLOCK:
@@ -220,22 +343,18 @@ class GovernancePipeline:
 
         return last_modify
 
-    async def _execute_sequential(
+    async def _execute_sequential_traced(
         self,
         group: list[HandlerRegistration],
         context: ActionContext,
+        handler_traces: list[HandlerTrace],
     ) -> GovernanceResult | None:
-        """Execute a sequential group of handlers one at a time.
-
-        Context modifications are chained: each MODIFY updates the context
-        for the next handler in the group.
-
-        Returns the first BLOCK result, or the last MODIFY, or None if all ALLOW.
-        """
+        """Execute a sequential group one at a time, recording traces."""
         last_modify: GovernanceResult | None = None
 
         for reg in group:
-            result = await self._safe_check(reg, context)
+            result, htrace = await self._safe_check_traced(reg, context)
+            handler_traces.append(htrace)
             if result is None:
                 continue
             if result.action == Verdict.BLOCK:
@@ -245,6 +364,35 @@ class GovernancePipeline:
                 last_modify = result
 
         return last_modify
+
+    async def _safe_check_traced(
+        self,
+        reg: HandlerRegistration,
+        context: ActionContext,
+    ) -> tuple[GovernanceResult | None, HandlerTrace]:
+        """Execute a handler with tracing and graceful degradation."""
+        start_ns = time.perf_counter_ns()
+        result = await self._safe_check(reg, context)
+        elapsed_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+
+        if result is None:
+            htrace = HandlerTrace(
+                handler_name=reg.handler.name,
+                verdict=Verdict.ALLOW,
+                reason="skipped (optional handler failed)",
+                duration_ms=elapsed_ms,
+            )
+        else:
+            htrace = HandlerTrace(
+                handler_name=reg.handler.name,
+                verdict=result.action,
+                reason=result.reason,
+                duration_ms=elapsed_ms,
+                suggestion=result.suggestion,
+                alternatives=list(result.alternatives),
+            )
+
+        return result, htrace
 
     async def _safe_check(
         self,

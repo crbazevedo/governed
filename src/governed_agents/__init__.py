@@ -11,6 +11,8 @@ Core types are exported here. Advanced features via submodule imports:
     from governed_agents.approval import ApprovalBackend, ApprovalRequest, ApprovalResponse
     from governed_agents.domain import GovernanceProfile, DomainBarrierHandler, DomainScope
     from governed_agents.handlers import PIIFilter, RateLimiter, BudgetGatekeeper, AuditLogger
+    from governed_agents.decorator import governed, configure, GovernanceError
+    from governed_agents.profile_loader import load_profile, load_pipeline_config
 """
 
 from governed_agents.handler import (
@@ -21,7 +23,7 @@ from governed_agents.handler import (
     Verdict,
 )
 from governed_agents.hitl import HITLIntent, HITLMessage
-from governed_agents.pipeline import GovernancePipeline
+from governed_agents.pipeline import ExecutionTrace, GovernancePipeline, HandlerTrace
 from governed_agents.vt import VTGovernanceHandler, VTTier
 
 __version__ = "0.1.0"
@@ -29,9 +31,11 @@ __version__ = "0.1.0"
 __all__ = [
     "ActionContext",
     "ExecutionMode",
+    "ExecutionTrace",
     "GovernanceHandler",
     "GovernancePipeline",
     "GovernanceResult",
+    "HandlerTrace",
     "HITLIntent",
     "HITLMessage",
     "Verdict",

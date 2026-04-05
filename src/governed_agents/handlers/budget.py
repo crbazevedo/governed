@@ -86,6 +86,12 @@ class BudgetGatekeeper(GovernanceHandler):
             return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=f"Budget exceeded: ${current:.2f} >= ${self._budget_limit:.2f}",
+                suggestion="Reduce cost by using a cheaper model or smaller context",
+                alternatives=[
+                    "Use a lighter model",
+                    "Batch with other requests",
+                    "Request budget increase",
+                ],
             )
 
         return GovernanceResult.continue_(

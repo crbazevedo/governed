@@ -167,6 +167,14 @@ class VTGovernanceHandler(GovernanceHandler):
                     f"Set metadata['vt2_approved']=True after owner confirms. "
                     f"Action: '{context.action}', Agent: '{context.agent_id}'"
                 ),
+                suggestion=(
+                    "Request approval via your ApprovalBackend, "
+                    "then retry with metadata['vt2_approved']=True"
+                ),
+                alternatives=[
+                    "Lower VT tier to VT1",
+                    "Request pre-approval for this action type",
+                ],
             )
 
         if tier_policy == "advise":
@@ -177,6 +185,14 @@ class VTGovernanceHandler(GovernanceHandler):
                     f"Escalate to owner for execution. "
                     f"Action: '{context.action}', Agent: '{context.agent_id}'"
                 ),
+                suggestion=(
+                    "This action requires advisory mode only. "
+                    "The agent should present a recommendation, not execute."
+                ),
+                alternatives=[
+                    "Present as recommendation",
+                    "Escalate to owner",
+                ],
             )
 
         # VT4 or unknown -- always block
@@ -187,4 +203,6 @@ class VTGovernanceHandler(GovernanceHandler):
                 f"This action cannot be delegated to agents. "
                 f"Action: '{context.action}', Agent: '{context.agent_id}'"
             ),
+            suggestion="Owner-only action. Route to the owner directly.",
+            alternatives=[],
         )

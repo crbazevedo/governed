@@ -159,8 +159,37 @@ class AOWHandler(GovernanceHandler):
                 reason="AOW window expiring -- action should be taken soon",
             )
 
-        # PENDING, EXPIRED, BLOCKED -- block the action
+        # PENDING, EXPIRED, BLOCKED -- block the action with structured feedback
+        if state == AOWState.PENDING:
+            return GovernanceResult.abort(
+                handler_name=self.name,
+                reason=f"AOW window is {state.value} -- action cannot proceed",
+                suggestion=f"Action window opens at {window.earliest.isoformat()}. Schedule for then.",
+                alternatives=[
+                    "Wait for window",
+                    "Request early access",
+                ],
+            )
+
+        if state == AOWState.EXPIRED:
+            latest_str = window.latest.isoformat() if window.latest else "unknown"
+            return GovernanceResult.abort(
+                handler_name=self.name,
+                reason=f"AOW window is {state.value} -- action cannot proceed",
+                suggestion=f"Action window closed at {latest_str}. Request a new window.",
+                alternatives=[
+                    "Request extension",
+                    "Create new AOW",
+                ],
+            )
+
+        # BLOCKED by dependencies
+        blocked_by = ", ".join(window.blocked_by) if window.blocked_by else "unknown"
         return GovernanceResult.abort(
             handler_name=self.name,
             reason=f"AOW window is {state.value} -- action cannot proceed",
+            suggestion=f"Blocked by: {blocked_by}. Complete those first.",
+            alternatives=[
+                "Complete blockers first",
+            ],
         )

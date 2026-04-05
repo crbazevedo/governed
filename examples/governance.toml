@@ -1,0 +1,36 @@
+# Governance profile and pipeline configuration.
+#
+# This file defines a corporate governance profile and a pipeline
+# that enforces PII filtering, rate limiting, VT tier governance,
+# budget controls, and audit logging.
+#
+# Load with: load_pipeline_config("governance.toml")
+
+[profile]
+domain = "corporate"
+default_vt = 2
+pii_sensitivity = 2
+audit_required = true
+
+[profile.vt_floor]
+read_email = 0
+search_docs = 1
+send_email = 2
+deploy = 3
+delete_data = 4
+
+[profile.blocked_tools]
+tools = ["personal_calendar", "health_records", "social_media"]
+
+[pipeline]
+handlers = ["pii_filter", "rate_limiter", "vt_governance", "budget", "audit"]
+
+[pipeline.rate_limiter]
+max_per_window = 10
+window_seconds = 60
+
+[pipeline.budget]
+limit_usd = 5.0
+
+[pipeline.pii_filter]
+redact = true

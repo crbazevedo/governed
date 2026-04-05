@@ -47,6 +47,21 @@ class InMemoryRateLimit(RateLimitPolicy):
         key = agent_id or "__global__"
         self._timestamps.setdefault(key, []).append(time.time())
 
+    def seconds_until_slot(self, agent_id: str) -> float:
+        """Return seconds until the oldest timestamp exits the window.
+
+        Returns 0.0 if a slot is already available.
+        """
+        now = time.time()
+        cutoff = now - self._window
+        key = agent_id or "__global__"
+        ts = [t for t in self._timestamps.get(key, []) if t > cutoff]
+        if len(ts) < self._max:
+            return 0.0
+        # Oldest timestamp in window -- wait for it to expire
+        oldest = min(ts)
+        return max(oldest + self._window - now, 0.0)
+
 
 class RateLimiter(GovernanceHandler):
     """Enforces action frequency limits via a pluggable policy.
@@ -79,9 +94,22 @@ class RateLimiter(GovernanceHandler):
         allowed = await self._policy.check(context.agent_id, context.action)
 
         if not allowed:
+            # Compute wait time if the policy supports it
+            wait_hint = ""
+            if isinstance(self._policy, InMemoryRateLimit):
+                secs = self._policy.seconds_until_slot(context.agent_id)
+                wait_hint = f"Wait {secs:.0f}s before retrying"
+            else:
+                wait_hint = "Wait for the current rate limit window to clear"
+
             return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=f"Rate limit exceeded for '{context.agent_id}'",
+                suggestion=wait_hint,
+                alternatives=[
+                    "Reduce action frequency",
+                    "Batch actions",
+                ],
             )
 
         await self._policy.record(context.agent_id, context.action)

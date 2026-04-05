@@ -59,9 +59,14 @@ class PIIFilter(GovernanceHandler):
             return GovernanceResult.continue_(handler_name=self.name)
 
         if not self._redact:
+            affected_fields = list({m.field_path for m in matches})
             return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=f"PII detected in payload ({len(matches)} matches, redaction disabled)",
+                suggestion="Remove PII from the payload before retrying",
+                alternatives=[
+                    f"Remove PII from field: {field}" for field in affected_fields
+                ],
             )
 
         redacted_payload = self._detector.redact(context.payload)
