@@ -51,6 +51,11 @@ class CallbackContext:
     payload: dict[str, Any] = field(default_factory=dict)  # Action payload
     metadata: dict[str, Any] = field(default_factory=dict)  # Handler-to-handler data
 
+    @property
+    def agent_name(self) -> str:
+        """Backward-compatible alias for agent_id."""
+        return self.agent_id
+
 
 @dataclass
 class CallbackResult:

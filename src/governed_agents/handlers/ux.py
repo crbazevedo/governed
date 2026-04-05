@@ -12,6 +12,7 @@ from governed_agents.handler import (
     CallbackResult,
 )
 from governed_agents.hitl import HITLIntent, HITLMessage
+from governed_agents.pii import redact_payload
 
 logger = logging.getLogger(__name__)
 
@@ -48,19 +49,27 @@ class UXHandler(CallbackHandler):
 
         trace_id = f"ux-{uuid.uuid4().hex[:8]}"
 
+        summary = f"VT{vt} action requires approval: {context.action}"
+        body = (
+            f"**Action:** {context.action}\n"
+            f"**Agent:** {context.agent_id}\n"
+            f"**VT Tier:** {vt}\n"
+            f"**Payload keys:** "
+            f"{list(context.payload.keys()) if context.payload else 'none'}"
+        )
+
+        # Scrub PII from composed message text (not just the payload)
+        scrubbed = redact_payload({"summary": summary, "body": body})
+        summary = scrubbed["summary"]
+        body = scrubbed["body"]
+
         hitl_msg = HITLMessage(
             trace_id=trace_id,
             intent=intent,
             agent_id=context.agent_id or "unknown",
             vt_tier=vt,
-            summary=f"VT{vt} action requires approval: {context.action}",
-            body=(
-                f"**Action:** {context.action}\n"
-                f"**Agent:** {context.agent_id}\n"
-                f"**VT Tier:** {vt}\n"
-                f"**Payload keys:** "
-                f"{list(context.payload.keys()) if context.payload else 'none'}"
-            ),
+            summary=summary,
+            body=body,
             options=["Approve", "Deny"] if vt == 2 else [],
             timeout_seconds=1800 if vt == 2 else None,
         )

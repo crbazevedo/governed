@@ -7,10 +7,10 @@ from governed_agents.hitl import HITLIntent, HITLMessage
 
 class TestHITLIntent:
     def test_values(self):
-        assert HITLIntent.INFORM == "inform"
-        assert HITLIntent.INPUT_REQUESTED == "input_requested"
-        assert HITLIntent.DECISION_REQUESTED == "decision_requested"
-        assert HITLIntent.ESCALATION == "escalation"
+        assert HITLIntent.INFORM == "INFORM"
+        assert HITLIntent.INPUT_REQUESTED == "INPUT_REQUESTED"
+        assert HITLIntent.DECISION_REQUESTED == "DECISION_REQUESTED"
+        assert HITLIntent.ESCALATION == "ESCALATION"
 
     def test_enum_is_str(self):
         assert isinstance(HITLIntent.INFORM, str)
@@ -54,13 +54,13 @@ class TestHITLMessage:
             vt_tier=4,
         )
         data = msg.model_dump()
-        assert data["intent"] == "escalation"
+        assert data["intent"] == "ESCALATION"
         assert data["summary"] == "Critical issue"
         assert data["vt_tier"] == 4
 
     def test_deserialization(self):
         data = {
-            "intent": "input_requested",
+            "intent": "INPUT_REQUESTED",
             "summary": "Need input",
             "body": "Please confirm.",
             "options": ["Yes", "No"],

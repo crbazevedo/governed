@@ -15,10 +15,10 @@ from pydantic import BaseModel, Field
 class HITLIntent(str, Enum):
     """Intent types for human-in-the-loop messages."""
 
-    INFORM = "inform"
-    INPUT_REQUESTED = "input_requested"
-    DECISION_REQUESTED = "decision_requested"
-    ESCALATION = "escalation"
+    INFORM = "INFORM"
+    INPUT_REQUESTED = "INPUT_REQUESTED"
+    DECISION_REQUESTED = "DECISION_REQUESTED"
+    ESCALATION = "ESCALATION"
 
 
 class HITLMessage(BaseModel):

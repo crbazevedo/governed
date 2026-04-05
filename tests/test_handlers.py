@@ -255,7 +255,7 @@ class TestUXHandler:
         assert result.action == ResultAction.MODIFY
         msg = result.modified_context.metadata.get("hitl_message")
         assert msg is not None
-        assert msg.intent.value == "decision_requested"
+        assert msg.intent.value == "DECISION_REQUESTED"
         assert "send_email" in msg.summary
 
     async def test_vt4_escalation_intent(self):
@@ -264,4 +264,4 @@ class TestUXHandler:
         result = await ux.check(ctx)
         assert result.action == ResultAction.MODIFY
         msg = result.modified_context.metadata.get("hitl_message")
-        assert msg.intent.value == "escalation"
+        assert msg.intent.value == "ESCALATION"
