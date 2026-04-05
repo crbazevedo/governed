@@ -1,0 +1,41 @@
+[project]
+name = "governed-agents"
+version = "0.1.0"
+description = "Governed autonomy middleware for AI agent systems"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "Carlos R. B. Azevedo"}]
+keywords = ["ai", "agents", "governance", "autonomy", "oversight", "hitl"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+amo = ["minimal-oversight>=0.1.0"]
+redis = ["redis>=5.0"]
+viz = ["rich>=13.0"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
+all = ["governed-agents[amo,redis,viz,dev]"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 99
+target-version = "py310"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
