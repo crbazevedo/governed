@@ -1,5 +1,7 @@
 """Built-in governance pipeline handlers.
 
+# Layer: Static (re-exports only)
+
 Each handler uses a pluggable backend via the interfaces in ``interfaces.py``.
 Built-in defaults require zero external deps. Swap in production backends
 (Presidio, Redis, litellm, etc.) via constructor injection.

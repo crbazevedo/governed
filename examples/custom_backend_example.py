@@ -14,7 +14,11 @@ from governed_agents import ActionContext, GovernancePipeline, VTGovernanceHandl
 from governed_agents.handlers import AuditLogger, PIIFilter
 from governed_agents.handlers.budget import BudgetGatekeeper
 from governed_agents.interfaces import (
-    AuditBackend, AuditEntry, CostProvider, PIIDetector, PIIMatch,
+    AuditBackend,
+    AuditEntry,
+    CostProvider,
+    PIIDetector,
+    PIIMatch,
 )
 
 
@@ -38,8 +42,7 @@ class BlocklistPIIDetector(PIIDetector):
         for key, val in payload.items():
             if isinstance(val, str):
                 out[key] = " ".join(
-                    "[BLOCKED]" if w.lower() in self._blocked else w
-                    for w in val.split()
+                    "[BLOCKED]" if w.lower() in self._blocked else w for w in val.split()
                 )
             else:
                 out[key] = val
@@ -78,7 +81,9 @@ async def main():
     pipeline.add(AuditLogger(backend=audit_be), optional=True)
 
     ctx = ActionContext(
-        action="summarize_doc", agent_id="analyst", vt_tier=1,
+        action="summarize_doc",
+        agent_id="analyst",
+        vt_tier=1,
         payload={"text": "This document is confidential and contains secret data"},
     )
     result = await pipeline.execute(ctx)

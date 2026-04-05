@@ -23,13 +23,14 @@ from governed_agents.handlers import PIIFilter
 
 TOOLS = {
     "search_docs": {"vt_tier": 1, "description": "Search internal docs"},
-    "send_email":  {"vt_tier": 2, "description": "Send email to external recipient"},
+    "send_email": {"vt_tier": 2, "description": "Send email to external recipient"},
 }
 
 
 @dataclass
 class ToolCall:
     """Simulates a Pydantic AI tool call result."""
+
     name: str
     args: dict
 

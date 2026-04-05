@@ -11,27 +11,33 @@ import asyncio
 from governed_agents import ActionContext, GovernancePipeline, VTGovernanceHandler
 from governed_agents.handler import GovernanceHandler, GovernanceResult
 from governed_agents.domain import (
-    DomainBarrierHandler, DomainScope, GovernanceProfile,
+    DomainBarrierHandler,
+    DomainScope,
+    GovernanceProfile,
 )
 
 PROFILES = {
     DomainScope.PERSONAL: GovernanceProfile(
         domain=DomainScope.PERSONAL,
-        vt_floor={"send_message": 1, "transfer_funds": 3}, default_vt=1,
+        vt_floor={"send_message": 1, "transfer_funds": 3},
+        default_vt=1,
     ),
     DomainScope.CORPORATE: GovernanceProfile(
         domain=DomainScope.CORPORATE,
-        vt_floor={"send_message": 2, "transfer_funds": 4}, default_vt=2,
+        vt_floor={"send_message": 2, "transfer_funds": 4},
+        default_vt=2,
     ),
 }
 
 
 class ContextCapture(GovernanceHandler):
     """Helper: captures the context after upstream modifications."""
+
     captured = None
 
     @property
-    def name(self): return "capture"
+    def name(self):
+        return "capture"
 
     async def evaluate(self, context):
         ContextCapture.captured = context
@@ -50,8 +56,11 @@ async def main():
         pipeline.add(barrier)
         pipeline.add(VTGovernanceHandler())
         ctx = ActionContext(
-            action="send_message", agent_id="assistant", vt_tier=1,
-            payload={"text": "Hello"}, metadata={"domain_scope": domain},
+            action="send_message",
+            agent_id="assistant",
+            vt_tier=1,
+            payload={"text": "Hello"},
+            metadata={"domain_scope": domain},
         )
         result = await pipeline.execute(ctx)
         floor = PROFILES[domain].get_vt_floor("send_message")
@@ -66,13 +75,17 @@ async def main():
     pipe.add(ContextCapture())
 
     ctx = ActionContext(
-        action="sync_calendar", agent_id="scheduler", vt_tier=1,
+        action="sync_calendar",
+        agent_id="scheduler",
+        vt_tier=1,
         payload={
-            "meeting_title": "Strategy (CONFIDENTIAL)", "attendees": "alice@corp.com",
-            "timestamp": "2025-03-15T10:00Z", "duration_minutes": 60, "urgency": "high",
+            "meeting_title": "Strategy (CONFIDENTIAL)",
+            "attendees": "alice@corp.com",
+            "timestamp": "2025-03-15T10:00Z",
+            "duration_minutes": 60,
+            "urgency": "high",
         },
-        metadata={"domain_scope": DomainScope.CORPORATE,
-                   "target_domain": DomainScope.PERSONAL},
+        metadata={"domain_scope": DomainScope.CORPORATE, "target_domain": DomainScope.PERSONAL},
     )
     await pipe.execute(ctx)
     cap = ContextCapture.captured

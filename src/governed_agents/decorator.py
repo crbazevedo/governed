@@ -1,5 +1,7 @@
 """@governed decorator -- the simplest way to add governance to any function.
 
+# Layer: Static (stateless wrapper -- pipeline is the stateful component)
+
 Wraps sync or async functions with governance pipeline enforcement.
 The decorated function only executes if the pipeline allows it.
 If blocked, raises ``GovernanceError`` with structured recovery guidance

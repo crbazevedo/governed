@@ -16,12 +16,14 @@ from governed_agents.profile_loader import load_pipeline_config, load_profile
 async def main():
     # ── Option 1: Load from a dict (works on all Python versions) ──
 
-    profile = load_profile({
-        "domain": "corporate",
-        "default_vt": 2,
-        "vt_floor": {"send_email": 2, "deploy": 3, "read_data": 0},
-        "blocked_tools": ["personal_calendar"],
-    })
+    profile = load_profile(
+        {
+            "domain": "corporate",
+            "default_vt": 2,
+            "vt_floor": {"send_email": 2, "deploy": 3, "read_data": 0},
+            "blocked_tools": ["personal_calendar"],
+        }
+    )
     print(f"Profile domain: {profile.domain}")
     print(f"  VT floor for 'deploy': {profile.get_vt_floor('deploy')}")
     print(f"  Is 'personal_calendar' allowed? {profile.is_tool_allowed('personal_calendar')}")
@@ -29,10 +31,12 @@ async def main():
 
     # ── Option 2: Build pipeline from dict config ──
 
-    pipeline = load_pipeline_config({
-        "handlers": ["pii_filter", "rate_limiter", "vt_governance", "audit"],
-        "rate_limiter": {"max_per_window": 10, "window_seconds": 60},
-    })
+    pipeline = load_pipeline_config(
+        {
+            "handlers": ["pii_filter", "rate_limiter", "vt_governance", "audit"],
+            "rate_limiter": {"max_per_window": 10, "window_seconds": 60},
+        }
+    )
 
     # Test with a VT1 action (should pass)
     ctx = ActionContext(

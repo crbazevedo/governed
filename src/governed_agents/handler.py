@@ -1,5 +1,7 @@
 """Core handler protocol and data types for the governance pipeline.
 
+# Layer: Static (stateless types, no external dependencies)
+
 Defines the fundamental building blocks:
 - Verdict: outcome enum (allow, block, modify)
 - ExecutionMode: handler execution strategy (sequential, parallel)

@@ -11,7 +11,10 @@ Run: python examples/langgraph_example.py
 import asyncio
 
 from governed_agents import (
-    ActionContext, GovernancePipeline, Verdict, VTGovernanceHandler,
+    ActionContext,
+    GovernancePipeline,
+    Verdict,
+    VTGovernanceHandler,
 )
 from governed_agents.handlers import PIIFilter
 
@@ -31,7 +34,9 @@ async def writer(state: dict) -> dict:
 async def governance_gate(state: dict, pipeline: GovernancePipeline) -> dict:
     """Governance node: check before publishing (VT2)."""
     ctx = ActionContext(
-        action="publish_report", agent_id="writer-agent", vt_tier=2,
+        action="publish_report",
+        agent_id="writer-agent",
+        vt_tier=2,
         payload={"content": state["draft"]},
         metadata=state.get("gov_metadata", {}),
     )
@@ -74,8 +79,10 @@ async def main():
 
     print("--- Run 1: No approval (VT2 blocks) ---")
     s1 = await run_graph({"topic": "Q4 results"}, pipeline)
-    print(f"  published={s1.get('published', False)}, "
-          f"awaiting_human={s1.get('awaiting_human', False)}\n")
+    print(
+        f"  published={s1.get('published', False)}, "
+        f"awaiting_human={s1.get('awaiting_human', False)}\n"
+    )
 
     print("--- Run 2: Pre-approved (VT2 passes) ---")
     s2 = await run_graph(

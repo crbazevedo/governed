@@ -22,9 +22,9 @@ from governed_agents.handlers import PIIFilter
 # --- Tool definitions with VT tiers ---
 
 TOOL_REGISTRY = {
-    "get_weather":     {"vt_tier": 0, "desc": "Fetch weather data (autonomous)"},
+    "get_weather": {"vt_tier": 0, "desc": "Fetch weather data (autonomous)"},
     "search_calendar": {"vt_tier": 1, "desc": "Read calendar events (logged)"},
-    "send_slack_msg":  {"vt_tier": 2, "desc": "Post to Slack channel (needs approval)"},
+    "send_slack_msg": {"vt_tier": 2, "desc": "Post to Slack channel (needs approval)"},
 }
 
 # --- Mock API response containing tool_use blocks ---
@@ -32,9 +32,14 @@ TOOL_REGISTRY = {
 MOCK_TOOL_CALLS = [
     {"type": "tool_use", "name": "get_weather", "input": {"city": "London"}},
     {"type": "tool_use", "name": "search_calendar", "input": {"date": "2025-01-15"}},
-    {"type": "tool_use", "name": "send_slack_msg", "input": {
-        "channel": "#clients", "text": "Meeting at 3pm with alice@corp.com",
-    }},
+    {
+        "type": "tool_use",
+        "name": "send_slack_msg",
+        "input": {
+            "channel": "#clients",
+            "text": "Meeting at 3pm with alice@corp.com",
+        },
+    },
 ]
 
 
@@ -69,9 +74,7 @@ async def main():
             print(f"  BLOCKED: {result.reason}\n")
         else:
             # Use the potentially modified context (PII-redacted payload)
-            final_payload = (
-                result.modified_context.payload if result.modified_context else args
-            )
+            final_payload = result.modified_context.payload if result.modified_context else args
             output = await execute_tool(name, final_payload)
             label = "auto" if vt == 0 else "logged for review"
             print(f"  EXECUTED ({label}): {output}")

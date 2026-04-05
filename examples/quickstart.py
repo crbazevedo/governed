@@ -23,10 +23,10 @@ async def main():
     print("=== Pipeline API ===\n")
 
     pipeline = GovernancePipeline()
-    pipeline.add(PIIFilter())                          # Redacts PII in payloads
-    pipeline.add(RateLimiter(max_per_window=3))        # Frequency limit
-    pipeline.add(VTGovernanceHandler())                 # VT tier enforcement
-    pipeline.add(AuditLogger(), optional=True)          # Audit log (optional)
+    pipeline.add(PIIFilter())  # Redacts PII in payloads
+    pipeline.add(RateLimiter(max_per_window=3))  # Frequency limit
+    pipeline.add(VTGovernanceHandler())  # VT tier enforcement
+    pipeline.add(AuditLogger(), optional=True)  # Audit log (optional)
 
     # --- VT1: agent acts, action is logged for review ---
     ctx1 = ActionContext(
@@ -36,7 +36,9 @@ async def main():
         payload={"to": "user@example.com", "body": "Meeting reminder"},
     )
     r1 = await pipeline.execute(ctx1)
-    print(f"VT1 action: {r1.action.value}")             # -> allow (PII redacted + review flag applied internally)
+    print(
+        f"VT1 action: {r1.action.value}"
+    )  # -> allow (PII redacted + review flag applied internally)
 
     # --- VT2: requires human approval (blocked without it) ---
     ctx2 = ActionContext(
@@ -46,9 +48,9 @@ async def main():
         payload={"to": "client@corp.com", "body": "Proposal attached"},
     )
     r2 = await pipeline.execute(ctx2)
-    print(f"VT2 action: {r2.action.value}")             # -> block
+    print(f"VT2 action: {r2.action.value}")  # -> block
     print(f"  Reason: {r2.reason}")
-    print(f"  Suggestion: {r2.suggestion}")              # Structured recovery guidance
+    print(f"  Suggestion: {r2.suggestion}")  # Structured recovery guidance
     print(f"  Alternatives: {r2.alternatives}")
 
     # --- VT0: fully autonomous, no restrictions ---
@@ -59,7 +61,7 @@ async def main():
         payload={"metric": "cpu_usage", "value": 42},
     )
     r3 = await pipeline.execute(ctx3)
-    print(f"VT0 action: {r3.action.value}")             # -> allow
+    print(f"VT0 action: {r3.action.value}")  # -> allow
 
     # ── Execution Trace ─────────────────────────────────────────
     print("\n=== Execution Trace ===\n")

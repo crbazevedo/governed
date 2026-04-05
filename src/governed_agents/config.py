@@ -1,5 +1,7 @@
 """Default configuration for governed-agents.
 
+# Layer: Static (constants, no runtime state)
+
 Provides sensible defaults for all governance parameters.
 Override at runtime by passing arguments to handler constructors.
 """

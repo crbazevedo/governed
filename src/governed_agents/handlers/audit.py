@@ -64,7 +64,7 @@ class AuditLogger(GovernanceHandler):
         backend: AuditBackend implementation. Defaults to LogAuditBackend.
     """
 
-    def __init__(self, backend: AuditBackend | None = None, **kwargs: object) -> None:
+    def __init__(self, backend: AuditBackend | None = None) -> None:
         self._backend = backend or LogAuditBackend()
 
     @property

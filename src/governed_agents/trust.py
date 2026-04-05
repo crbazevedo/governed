@@ -12,7 +12,7 @@ Trust converges to true competence through observation and decays without eviden
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from governed_agents.handler import ActionContext, GovernanceHandler, GovernanceResult
 
@@ -316,8 +316,6 @@ class TrustEvolutionHandler(GovernanceHandler):
                 handler_name=self.name,
                 reason=f"Recommended VT{rec.recommended_vt} constrained by floor VT{floor}",
             )
-
-        from dataclasses import replace
 
         new_meta = {
             **context.metadata,

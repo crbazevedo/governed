@@ -1,5 +1,7 @@
 """VT (Verified Trust) governance tier system.
 
+# Layer: Static (stateless policy enforcement)
+
 Implements the five-tier governance model for agent autonomy:
     VT0 (auto):    Agent acts freely -- no restrictions.
     VT1 (log):     Agent acts, action logged for review.
@@ -16,8 +18,7 @@ Provides:
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum
 
 from governed_agents.config import VT_TIERS

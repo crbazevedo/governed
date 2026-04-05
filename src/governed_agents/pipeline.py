@@ -1,5 +1,7 @@
 """Governance pipeline for multi-handler enforcement.
 
+# Layer: Static (stateless orchestration -- state lives in handlers)
+
 Implements the middleware chain pattern supporting:
 - Priority-ordered handler groups
 - Mixed parallel/sequential execution within groups
@@ -30,6 +32,7 @@ from governed_agents.handler import (
     HandlerRegistration,
     Verdict,
 )
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -418,6 +421,14 @@ class GovernancePipeline:
                 return GovernanceResult.abort(
                     handler_name=reg.handler.name,
                     reason=f"Handler '{reg.handler.name}' raised an exception",
+                    suggestion="Check handler logs for the exception traceback and fix the handler",
+                    alternatives=[
+                        "Mark the handler as optional if it should not block the pipeline"
+                    ],
+                    recovery=RecoveryPlan(
+                        primary=RecoveryAction.DELEGATE_TO_HUMAN,
+                        explanation=f"Handler '{reg.handler.name}' crashed unexpectedly",
+                    ),
                 )
 
 

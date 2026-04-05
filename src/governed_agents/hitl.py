@@ -1,5 +1,7 @@
 """Human-in-the-loop (HITL) communication models.
 
+# Layer: Static (data models, no runtime state)
+
 Defines the intent types and message format for agent-to-human
 communication in governed agent systems.
 """

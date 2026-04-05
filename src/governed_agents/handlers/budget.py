@@ -62,8 +62,6 @@ class BudgetGatekeeper(GovernanceHandler):
         self,
         budget_limit_usd: float = 5.0,
         cost_provider: CostProvider | None = None,
-        # Backward compat: accept a simple callable
-        cost_callback: None = None,
     ) -> None:
         self._budget_limit = budget_limit_usd
         if cost_provider is not None:

@@ -1,5 +1,7 @@
 """governed-agents -- Governed autonomy middleware for AI agent systems.
 
+# Layer: Static (public API surface -- re-exports only)
+
 Drop-in governance pipeline with VT (Verified Trust) risk tiers,
 PII redaction, rate limiting, budget controls, and human-in-the-loop
 escalation for any Python agent framework.

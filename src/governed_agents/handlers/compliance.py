@@ -1,9 +1,17 @@
-"""ComplianceChecker handler -- validates payload size, VT consistency, audit readiness."""
+"""ComplianceChecker handler -- validates payload size, VT consistency, audit readiness.
+
+# Layer: Static (stateless governance handler)
+
+Checks that agent actions meet structural governance requirements
+before execution: payload size limits, audit trail readiness, and
+VT tier consistency. Catches configuration errors (like mismatched
+VT tiers) early, before they cause confusing downstream failures.
+"""
 
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
+from dataclasses import replace
 from typing import Any
 
 from governed_agents.config import MAX_PAYLOAD_SIZE_KB
@@ -12,6 +20,7 @@ from governed_agents.handler import (
     GovernanceHandler,
     GovernanceResult,
 )
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -80,14 +89,21 @@ class ComplianceChecker(GovernanceHandler):
             return GovernanceResult.abort(
                 handler_name=self.name,
                 reason=f"Compliance violations: {violation_msg}",
+                suggestion="Fix the listed violations and retry",
+                alternatives=[v for v in violations],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.RETRY_LOWER_SCOPE,
+                    alternatives=[RecoveryAction.DELEGATE_TO_HUMAN],
+                    explanation=f"{len(violations)} compliance violation(s) detected",
+                ),
             )
 
         # Non-strict: log and continue
         logger.warning("ComplianceChecker: non-strict violations: %s", violation_msg)
-        new_context = deepcopy(context)
-        new_context.metadata["compliance_warnings"] = violations
+        new_metadata = {**context.metadata, "compliance_warnings": violations}
+        modified = replace(context, metadata=new_metadata)
         return GovernanceResult.modify(
-            modified_context=new_context,
+            modified_context=modified,
             handler_name=self.name,
             reason=f"Compliance warnings (non-strict): {violation_msg}",
         )

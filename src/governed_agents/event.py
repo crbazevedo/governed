@@ -1,5 +1,7 @@
 """Framework-agnostic governed event model.
 
+# Layer: Static (data model, no runtime state)
+
 Provides a standard event structure for governed agent systems,
 carrying VT tier, routing, and payload information.
 """

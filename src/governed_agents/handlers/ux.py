@@ -1,4 +1,11 @@
-"""UXHandler -- formats VT2+ actions as HITL messages for human review."""
+"""UXHandler -- formats VT2+ actions as HITL messages for human review.
+
+# Layer: Static (stateless governance handler)
+
+Bridges the gap between the governance pipeline and human review UX.
+For VT2+ actions, creates structured HITL messages that downstream
+systems (Slack, CLI, web UI) can present to the human reviewer.
+"""
 
 from __future__ import annotations
 

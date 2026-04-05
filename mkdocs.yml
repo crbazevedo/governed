@@ -1,0 +1,44 @@
+site_name: governed-agents
+site_description: Governed autonomy middleware for AI agent systems
+site_url: https://crbazevedo.github.io/governed/
+repo_url: https://github.com/crbazevedo/governed
+repo_name: crbazevedo/governed
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: blue
+      accent: amber
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+
+nav:
+  - Home: index.md
+  - Principles: PRINCIPLES.md
+  - Guide:
+    - Getting Started: guide/getting-started.md
+    - Pipeline: guide/pipeline.md
+    - Trust & Earned Autonomy: guide/trust.md
+    - Recovery: guide/recovery.md
+    - Blast Radius: guide/blast-radius.md
+    - Handlers: guide/handlers.md
+    - Custom Backends: guide/custom-backends.md
+    - Decorator: guide/decorator.md
+    - Configuration: guide/config.md
+    - Advanced: guide/advanced.md
+  - Comparisons: comparisons.md
+  - Theory: theory.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true

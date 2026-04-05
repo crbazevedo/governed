@@ -40,10 +40,13 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from governed_agents.domain import GovernanceProfile
 from governed_agents.pipeline import GovernancePipeline
+
+if TYPE_CHECKING:
+    from governed_agents.handler import GovernanceHandler
 
 # Use tomllib (3.11+) or fall back to no TOML support on 3.10
 if sys.version_info >= (3, 11):
@@ -143,10 +146,10 @@ def load_profile(source: str | Path | dict[str, Any]) -> GovernanceProfile:
 # Handler registry for declarative pipeline config
 # ──────────────────────────────────────────────
 
-_HANDLER_REGISTRY: dict[str, type] = {}
+_HANDLER_REGISTRY: dict[str, type[GovernanceHandler]] = {}
 
 
-def _ensure_registry() -> dict[str, type]:
+def _ensure_registry() -> dict[str, type[GovernanceHandler]]:
     """Lazy-initialize the handler name -> class registry.
 
     This avoids circular imports by deferring handler imports until needed.
@@ -184,14 +187,13 @@ def _ensure_registry() -> dict[str, type]:
     return _HANDLER_REGISTRY
 
 
-def _build_handler(name: str, handler_config: dict[str, Any]) -> Any:
+def _build_handler(name: str, handler_config: dict[str, Any]) -> GovernanceHandler:
     """Instantiate a handler by name with optional config kwargs."""
     registry = _ensure_registry()
     handler_cls = registry.get(name)
     if handler_cls is None:
-        raise ValueError(
-            f"Unknown handler '{name}'. Available: {sorted(set(registry.values()), key=lambda c: c.__name__)}"
-        )
+        available = sorted({cls.__name__ for cls in registry.values()})
+        raise ValueError(f"Unknown handler '{name}'. Available: {', '.join(available)}")
 
     # Map config keys to constructor kwargs
     kwargs: dict[str, Any] = {}

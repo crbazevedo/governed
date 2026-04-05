@@ -1,5 +1,7 @@
 """Optional AMO (Autonomous Multi-agent Oversight) integration.
 
+# Layer: Persistent (optional, requires minimal-oversight)
+
 Requires the [amo] extra: pip install governed-agents[amo]
 """
 

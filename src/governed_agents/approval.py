@@ -1,5 +1,7 @@
 """Approval protocol -- interface for VT2+ human-in-the-loop approval.
 
+# Layer: Static (interface definitions, no implementation)
+
 The library defines the contract. Implementations (Redis, Slack, CLI, etc.)
 are provided by the consuming application.
 """
