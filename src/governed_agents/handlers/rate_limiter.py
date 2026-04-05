@@ -18,6 +18,7 @@ from governed_agents.handler import (
     GovernanceResult,
 )
 from governed_agents.interfaces import RateLimitPolicy
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +97,10 @@ class RateLimiter(GovernanceHandler):
         if not allowed:
             # Compute wait time if the policy supports it
             wait_hint = ""
+            delay_seconds: float = 0.0
             if isinstance(self._policy, InMemoryRateLimit):
-                secs = self._policy.seconds_until_slot(context.agent_id)
-                wait_hint = f"Wait {secs:.0f}s before retrying"
+                delay_seconds = self._policy.seconds_until_slot(context.agent_id)
+                wait_hint = f"Wait {delay_seconds:.0f}s before retrying"
             else:
                 wait_hint = "Wait for the current rate limit window to clear"
 
@@ -110,6 +112,11 @@ class RateLimiter(GovernanceHandler):
                     "Reduce action frequency",
                     "Batch actions",
                 ],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.RETRY_AFTER_DELAY,
+                    alternatives=[RecoveryAction.BATCH_WITH_OTHERS],
+                    context={"delay_seconds": delay_seconds},
+                ),
             )
 
         await self._policy.record(context.agent_id, context.action)

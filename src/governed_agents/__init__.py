@@ -24,6 +24,7 @@ from governed_agents.handler import (
 )
 from governed_agents.hitl import HITLIntent, HITLMessage
 from governed_agents.pipeline import ExecutionTrace, GovernancePipeline, HandlerTrace
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 from governed_agents.vt import VTGovernanceHandler, VTTier
 
 __version__ = "0.1.0"
@@ -38,6 +39,8 @@ __all__ = [
     "HandlerTrace",
     "HITLIntent",
     "HITLMessage",
+    "RecoveryAction",
+    "RecoveryPlan",
     "Verdict",
     "VTGovernanceHandler",
     "VTTier",

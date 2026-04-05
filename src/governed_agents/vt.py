@@ -26,6 +26,7 @@ from governed_agents.handler import (
     GovernanceHandler,
     GovernanceResult,
 )
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +195,13 @@ class VTGovernanceHandler(GovernanceHandler):
                     "Lower VT tier to VT1",
                     "Request pre-approval for this action type",
                 ],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.RETRY_WITH_APPROVAL,
+                    alternatives=[
+                        RecoveryAction.DOWNGRADE_TO_ADVISORY,
+                        RecoveryAction.DELEGATE_TO_HUMAN,
+                    ],
+                ),
             )
 
         if tier_policy == "advise":
@@ -212,6 +220,10 @@ class VTGovernanceHandler(GovernanceHandler):
                     "Present as recommendation",
                     "Escalate to owner",
                 ],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.DOWNGRADE_TO_ADVISORY,
+                    alternatives=[RecoveryAction.DELEGATE_TO_HUMAN],
+                ),
             )
 
         # VT4 or unknown -- always block
@@ -224,4 +236,7 @@ class VTGovernanceHandler(GovernanceHandler):
             ),
             suggestion="Owner-only action. Route to the owner directly.",
             alternatives=[],
+            recovery=RecoveryPlan(
+                primary=RecoveryAction.DELEGATE_TO_HUMAN,
+            ),
         )

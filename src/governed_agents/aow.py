@@ -18,6 +18,7 @@ from governed_agents.handler import (
     GovernanceHandler,
     GovernanceResult,
 )
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 
 class AOWState(str, Enum):
@@ -169,6 +170,10 @@ class AOWHandler(GovernanceHandler):
                     "Wait for window",
                     "Request early access",
                 ],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.RETRY_AFTER_DELAY,
+                    context={"opens_at": window.earliest.isoformat()},
+                ),
             )
 
         if state == AOWState.EXPIRED:
@@ -181,10 +186,15 @@ class AOWHandler(GovernanceHandler):
                     "Request extension",
                     "Create new AOW",
                 ],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.DELEGATE_TO_HUMAN,
+                    alternatives=[RecoveryAction.RETRY_WITH_APPROVAL],
+                ),
             )
 
         # BLOCKED by dependencies
-        blocked_by = ", ".join(window.blocked_by) if window.blocked_by else "unknown"
+        blocked_by_list = window.blocked_by if window.blocked_by else []
+        blocked_by = ", ".join(blocked_by_list) if blocked_by_list else "unknown"
         return GovernanceResult.abort(
             handler_name=self.name,
             reason=f"AOW window is {state.value} -- action cannot proceed",
@@ -192,4 +202,8 @@ class AOWHandler(GovernanceHandler):
             alternatives=[
                 "Complete blockers first",
             ],
+            recovery=RecoveryPlan(
+                primary=RecoveryAction.RETRY_AFTER_DELAY,
+                context={"blocked_by": blocked_by_list},
+            ),
         )

@@ -20,6 +20,7 @@ from governed_agents.handler import (
     GovernanceResult,
 )
 from governed_agents.interfaces import CostProvider
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,17 @@ class BudgetGatekeeper(GovernanceHandler):
                     "Batch with other requests",
                     "Request budget increase",
                 ],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.USE_CHEAPER_RESOURCE,
+                    alternatives=[
+                        RecoveryAction.BATCH_WITH_OTHERS,
+                        RecoveryAction.DELEGATE_TO_HUMAN,
+                    ],
+                    context={
+                        "current_cost": current,
+                        "limit": self._budget_limit,
+                    },
+                ),
             )
 
         return GovernanceResult.continue_(

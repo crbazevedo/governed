@@ -19,6 +19,7 @@ from governed_agents.handler import (
 )
 from governed_agents.interfaces import PIIDetector
 from governed_agents.pii import RegexPIIDetector
+from governed_agents.recovery import RecoveryAction, RecoveryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,11 @@ class PIIFilter(GovernanceHandler):
                 reason=f"PII detected in payload ({len(matches)} matches, redaction disabled)",
                 suggestion="Remove PII from the payload before retrying",
                 alternatives=[f"Remove PII from field: {field}" for field in affected_fields],
+                recovery=RecoveryPlan(
+                    primary=RecoveryAction.RETRY_LOWER_SCOPE,
+                    alternatives=[RecoveryAction.DELEGATE_TO_HUMAN],
+                    context={"pii_fields": affected_fields},
+                ),
             )
 
         redacted_payload = self._detector.redact(context.payload)

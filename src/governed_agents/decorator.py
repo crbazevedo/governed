@@ -42,15 +42,17 @@ F = TypeVar("F", bound=Callable[..., Any])
 class GovernanceError(Exception):
     """Raised when a governed action is blocked by the pipeline.
 
-    Carries the full ``GovernanceResult`` including ``suggestion`` and
-    ``alternatives`` so that callers (or agents) can programmatically
-    inspect what went wrong and how to recover.
+    Carries the full ``GovernanceResult`` including ``suggestion``,
+    ``alternatives``, and ``recovery`` (typed RecoveryPlan) so that
+    callers (or agents) can programmatically inspect what went wrong
+    and how to recover.
     """
 
     def __init__(self, result: GovernanceResult) -> None:
         self.result = result
         self.suggestion = result.suggestion
         self.alternatives = list(result.alternatives)
+        self.recovery = result.recovery
         super().__init__(result.reason)
 
 

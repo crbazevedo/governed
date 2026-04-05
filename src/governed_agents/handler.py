@@ -14,7 +14,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from governed_agents.recovery import RecoveryPlan
 
 
 # ──────────────────────────────────────────────
@@ -77,6 +80,13 @@ class GovernanceResult:
     """Actionable fix hint -- tells the agent exactly what to do to unblock."""
     alternatives: list[str] = field(default_factory=list)
     """Concrete things the agent could try instead of the blocked action."""
+    recovery: RecoveryPlan | None = None
+    """Typed, programmatic recovery plan for BLOCK verdicts.
+
+    While ``suggestion`` and ``alternatives`` are human-readable strings kept
+    for backward compatibility, ``recovery`` provides a typed vocabulary that
+    agent frameworks can act on programmatically.
+    """
 
     @classmethod
     def continue_(cls, handler_name: str = "", reason: str = "") -> GovernanceResult:
@@ -90,6 +100,7 @@ class GovernanceResult:
         reason: str = "",
         suggestion: str = "",
         alternatives: list[str] | None = None,
+        recovery: RecoveryPlan | None = None,
     ) -> GovernanceResult:
         """Factory for a BLOCK result with structured recovery guidance.
 
@@ -100,6 +111,8 @@ class GovernanceResult:
                         and retry successfully.
             alternatives: List of concrete alternative approaches the agent
                           could take instead.
+            recovery: Typed recovery plan for programmatic self-repair.
+                      Complements the human-readable suggestion/alternatives.
         """
         return cls(
             action=Verdict.BLOCK,
@@ -107,6 +120,7 @@ class GovernanceResult:
             reason=reason,
             suggestion=suggestion,
             alternatives=alternatives or [],
+            recovery=recovery,
         )
 
     @classmethod
